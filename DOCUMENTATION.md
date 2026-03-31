@@ -259,7 +259,7 @@ uri_gator/
 ### As a library
 
 ```typescript
-import { extractRDF, type ExtractedRDF } from 'uri_gator';
+import { extractRDF, type ExtractedRDF } from './rdf-extractor.ts';
 
 const result: ExtractedRDF | null = await extractRDF('https://example.org/dataset');
 
@@ -279,7 +279,7 @@ Install in another Bun project with:
 bun add github:cedricdcc/uri_gator
 ```
 
-### As a CLI tool
+### As a CLI tool — first-match mode
 
 ```sh
 bun run rdf-extractor.ts https://example.org/dataset
@@ -295,6 +295,44 @@ Content length: 4821 chars
 --- First 500 chars of RDF ---
 @prefix dcat: <http://www.w3.org/ns/dcat#> .
 ...
+```
+
+### As a CLI tool — `--all` mode (explore all paths)
+
+Pass `--all` to run every extraction strategy and get a full overview of what is available for the resource, instead of stopping at the first success:
+
+```sh
+bun run rdf-extractor.ts --all https://example.org/dataset
+```
+
+Example output:
+```
+🔍 Exploring all RDF paths for: https://example.org/dataset
+
+  ✅ Strategy 1 — Content Negotiation
+       text/turtle  https://example.org/dataset  (4821 chars)
+  ✅ Strategy 2 — HTTP Link header (rel=describedby)
+       text/turtle  https://example.org/dataset.ttl  (4821 chars)
+  ❌ Strategy 3 — Linkset (rel=linkset)
+  ❌ Strategy 4 — HTML link[rel=describedby]
+  ✅ Strategy 5 — Embedded RDF script
+       application/ld+json  https://example.org/dataset  (312 chars)
+  ❌ Strategy 6 — Sitemap signposting (robots.txt)
+
+📊 3 RDF source(s) found across 6 strategies tried.
+```
+
+### As a library — `extractAllRDF`
+
+```typescript
+import { extractAllRDF, type RDFOverview } from './rdf-extractor.ts';
+
+const overview: RDFOverview = await extractAllRDF('https://example.org/dataset');
+
+for (const rdf of overview.found) {
+  console.log(rdf.source, rdf.format, rdf.url);
+}
+console.log('Not found via:', overview.notFound);
 ```
 
 ---
