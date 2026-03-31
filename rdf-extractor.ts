@@ -80,6 +80,67 @@ function baseMime(contentType: string | null): string {
   return (semi === -1 ? contentType : contentType.slice(0, semi)).trim().toLowerCase();
 }
 
+function relHasToken(rel: string | null | undefined, token: string): boolean {
+  if (!rel) return false;
+  return rel
+    .toLowerCase()
+    .split(/\s+/)
+    .some((r) => r.trim() === token);
+}
+
+function parseTagAttributes(tagText: string): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  const attrRegex = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
+  let match: RegExpExecArray | null;
+  while ((match = attrRegex.exec(tagText)) !== null) {
+    const key = (match[1] ?? '').toLowerCase();
+    const val = (match[2] ?? match[3] ?? match[4] ?? '').trim();
+    if (key) attrs[key] = val;
+  }
+  return attrs;
+}
+
+function extractHtmlHints(bodyText: string): {
+  describedByLinks: Array<{ href: string; type: string | null }>;
+  linksets: string[];
+  embeddedScripts: Array<{ type: string; content: string }>;
+} {
+  const describedByLinks: Array<{ href: string; type: string | null }> = [];
+  const linksets: string[] = [];
+  const embeddedScripts: Array<{ type: string; content: string }> = [];
+
+  const linkRegex = /<link\b[^>]*>/gi;
+  let linkMatch: RegExpExecArray | null;
+  while ((linkMatch = linkRegex.exec(bodyText)) !== null) {
+    const tag = linkMatch[0] ?? '';
+    if (!tag) continue;
+    const attrs = parseTagAttributes(tag);
+    const rel = attrs['rel'] ?? null;
+    const href = attrs['href'] ?? null;
+    const type = attrs['type'] ?? null;
+    if (!href) continue;
+    if (relHasToken(rel, 'describedby')) {
+      describedByLinks.push({ href, type });
+    }
+    if (relHasToken(rel, 'linkset')) {
+      linksets.push(href);
+    }
+  }
+
+  const scriptRegex = /(<script\b[^>]*>)([\s\S]*?)<\/script>/gi;
+  let scriptMatch: RegExpExecArray | null;
+  while ((scriptMatch = scriptRegex.exec(bodyText)) !== null) {
+    const openTag = scriptMatch[1] ?? '';
+    const content = (scriptMatch[2] ?? '').trim();
+    if (!openTag || !content) continue;
+    const attrs = parseTagAttributes(openTag);
+    const type = (attrs['type'] ?? '').toLowerCase();
+    if (type) embeddedScripts.push({ type, content });
+  }
+
+  return { describedByLinks, linksets, embeddedScripts };
+}
+
 /** Fetch a URL with RDF content negotiation */
 async function fetchRDF(url: string): Promise<Response> {
   return fetch(url, {
@@ -272,11 +333,17 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
   let htmlDoc: Document | null = null;
   if (bodyText) {
     try {
-      htmlDoc = new DOMParser().parseFromString(bodyText, 'text/html');
+      if (typeof DOMParser !== 'undefined') {
+        htmlDoc = new DOMParser().parseFromString(bodyText, 'text/html');
+      }
     } catch {
       // not HTML, ignore
     }
   }
+
+  const htmlHints = bodyText
+    ? extractHtmlHints(bodyText)
+    : { describedByLinks: [], linksets: [], embeddedScripts: [] };
 
   // 2. HTTP Link headers (FAIR signposting + linksets)
   const linkHeader = res.headers.get('link');
@@ -309,54 +376,78 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
   }
 
   // 3. HTML FAIR signposting + embedded RDF scripts
+  const htmlDescribedBy = new Map<string, string | null>();
+  const htmlLinksets = new Set<string>();
+  const htmlScripts: Array<{ type: string; content: string }> = [];
+
   if (htmlDoc) {
-    // <link rel="describedby"> in HTML
-    const htmlLinks = htmlDoc.querySelectorAll('link[rel="describedby"]');
-    for (const el of htmlLinks) {
+    for (const el of htmlDoc.querySelectorAll('link')) {
+      const rel = el.getAttribute('rel');
       const href = el.getAttribute('href');
       const type = el.getAttribute('type');
-      if (href && (!type || isRDFMime(type))) {
-        const metaUrl = new URL(href, uri).toString();
-        const metaRes = await fetchRDF(metaUrl);
-        const metaCt = baseMime(metaRes.headers.get('content-type'));
-        if (isRDFMime(metaCt) && metaRes.ok) {
-          return {
-            content: await metaRes.text(),
-            format: metaCt,
-            source: 'signposting-html-link',
-            url: metaUrl,
-          };
-        }
+      if (!href) continue;
+      if (relHasToken(rel, 'describedby')) {
+        htmlDescribedBy.set(href, type);
+      }
+      if (relHasToken(rel, 'linkset')) {
+        htmlLinksets.add(href);
       }
     }
 
-    // <link rel="linkset"> in HTML
-    const htmlLinksets = htmlDoc.querySelectorAll('link[rel="linkset"]');
-    for (const el of htmlLinksets) {
-      const href = el.getAttribute('href');
-      if (href) {
-        const lsUrl = new URL(href, uri).toString();
-        const rdf = await tryExtractFromLinkset(lsUrl, uri);
-        if (rdf) return rdf;
-      }
-    }
-
-    // Embedded <script type="text/turtle"> or application/ld+json etc.
-    // (this matches your "<script describedby>" description)
-    const scripts = htmlDoc.querySelectorAll('script[type]');
-    for (const script of scripts) {
+    for (const script of htmlDoc.querySelectorAll('script[type]')) {
       const type = script.getAttribute('type')?.toLowerCase() ?? '';
-      if (isRDFMime(type)) {
-        const content = script.textContent?.trim();
-        if (content) {
-          return {
-            content,
-            format: type,
-            source: 'embedded-script',
-            url: uri,
-          };
-        }
+      const content = script.textContent?.trim() ?? '';
+      if (type && content) {
+        htmlScripts.push({ type, content });
       }
+    }
+  }
+
+  for (const link of htmlHints.describedByLinks) {
+    htmlDescribedBy.set(link.href, link.type);
+  }
+  for (const linkset of htmlHints.linksets) {
+    htmlLinksets.add(linkset);
+  }
+  htmlScripts.push(...htmlHints.embeddedScripts);
+
+  for (const [href, type] of htmlDescribedBy) {
+    if (!type || isRDFMime(type)) {
+      const metaUrl = new URL(href, uri).toString();
+      let metaRes: Response;
+      try {
+        metaRes = await fetchRDF(metaUrl);
+      } catch {
+        continue;
+      }
+      const metaCt = baseMime(metaRes.headers.get('content-type'));
+      if (isRDFMime(metaCt) && metaRes.ok) {
+        return {
+          content: await metaRes.text(),
+          format: metaCt,
+          source: 'signposting-html-link',
+          url: metaUrl,
+        };
+      }
+    }
+  }
+
+  for (const href of htmlLinksets) {
+    const lsUrl = new URL(href, uri).toString();
+    const rdf = await tryExtractFromLinkset(lsUrl, uri);
+    if (rdf) return rdf;
+  }
+
+  // Embedded <script type="text/turtle"> or application/ld+json etc.
+  for (const script of htmlScripts) {
+    const type = script.type.toLowerCase();
+    if (isRDFMime(type)) {
+      return {
+        content: script.content,
+        format: type,
+        source: 'embedded-script',
+        url: uri,
+      };
     }
   }
 

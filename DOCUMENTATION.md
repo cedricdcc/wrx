@@ -259,7 +259,7 @@ uri_gator/
 ### As a library
 
 ```typescript
-import { extractRDF, type ExtractedRDF } from './rdf-extractor.ts';
+import { extractRDF, type ExtractedRDF } from 'uri_gator';
 
 const result: ExtractedRDF | null = await extractRDF('https://example.org/dataset');
 
@@ -271,6 +271,12 @@ if (result) {
 } else {
   console.log('No RDF found.');
 }
+```
+
+Install in another Bun project with:
+
+```sh
+bun add github:cedricdcc/uri_gator
 ```
 
 ### As a CLI tool

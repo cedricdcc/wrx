@@ -1,8 +1,39 @@
 {
   "name": "uri_gator",
-  "module": "rdf-extractor.ts",
+  "version": "0.1.0",
+  "description": "Bun TypeScript module to extract RDF metadata from a URI using cascading discovery strategies.",
+  "module": "./rdf-extractor.ts",
+  "types": "./rdf-extractor.ts",
+  "exports": {
+    ".": "./rdf-extractor.ts"
+  },
   "type": "module",
-  "private": true,
+  "private": false,
+  "files": [
+    "rdf-extractor.ts",
+    "bun-globals.d.ts",
+    "README.md",
+    "DOCUMENTATION.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cedricdcc/uri_gator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cedricdcc/uri_gator/issues"
+  },
+  "homepage": "https://github.com/cedricdcc/uri_gator#readme",
+  "keywords": [
+    "rdf",
+    "linked-data",
+    "metadata",
+    "signposting",
+    "bun",
+    "typescript"
+  ],
+  "scripts": {
+    "test": "bun test"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
