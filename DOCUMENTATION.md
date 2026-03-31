@@ -11,7 +11,7 @@
 ```mermaid
 graph TB
     subgraph "rdf-extractor.ts — Public API"
-        A["extractRDF(uri: string)\n→ Promise&lt;ExtractedRDF | null&gt;"]
+        A["extractRDF(uri: string)\nreturns Promise of ExtractedRDF or null"]
     end
 
     subgraph "Internal Helpers"
@@ -113,18 +113,18 @@ flowchart TD
     LS_HDR -->|no linkset or no RDF| HTML_DB
 
     %% ── Step 3a: HTML describedby ─────────────────────────────────────────
-    HTML_DB["**Step 3a — HTML &lt;link rel=describedby&gt;**\nFor each &lt;link rel=describedby&gt; in HTML\n(type is RDF or absent)"]
+    HTML_DB["**Step 3a — HTML link rel=describedby**\nFor each link[rel=describedby] in HTML\ntype is RDF or absent"]
     HTML_DB -->|no HTML or no matching link| HTML_LS
     HTML_DB -->|fetch target → RDF| RET4(["`return ExtractedRDF\nsource: 'signposting-html-link'`"])
     HTML_DB -->|fetch target → not RDF| HTML_LS
 
     %% ── Step 3b: HTML linkset ─────────────────────────────────────────────
-    HTML_LS["**Step 3b — HTML &lt;link rel=linkset&gt;**\nFor each &lt;link rel=linkset&gt; in HTML\ncall tryExtractFromLinkset()"]
+    HTML_LS["**Step 3b — HTML link rel=linkset**\nFor each link[rel=linkset] in HTML\ncall tryExtractFromLinkset()"]
     HTML_LS -->|linkset yields RDF| RET5(["`return ExtractedRDF\nsource: 'linkset'`"])
     HTML_LS -->|no linkset or no RDF| SCRIPT
 
     %% ── Step 3c: Embedded script ──────────────────────────────────────────
-    SCRIPT["**Step 3c — Embedded RDF &lt;script&gt;**\nFor each &lt;script type=…&gt; where type is RDF MIME\n(e.g. application/ld+json, text/turtle)"]
+    SCRIPT["**Step 3c — Embedded RDF script**\nFor each script[type=RDF MIME] in HTML\ne.g. application/ld+json, text/turtle"]
     SCRIPT -->|found non-empty script| RET6(["`return ExtractedRDF\nsource: 'embedded-script'`"])
     SCRIPT -->|none found| SITEMAP
 
@@ -199,7 +199,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     SM_START(["tryExtractFromSitemapAndDCAT(uri)"])
-    SM_START --> ROBOTS["fetch {protocol}//{host}/robots.txt"]
+    SM_START --> ROBOTS["fetch /robots.txt from base URL"]
     ROBOTS -->|error or non-200| SM_NULL([return null])
     ROBOTS -->|ok| PARSE_ROBOTS["Parse Sitemap: directives from robots.txt"]
     PARSE_ROBOTS --> FOR_SM["For each sitemapUrl …"]
@@ -208,11 +208,11 @@ flowchart TD
     NEXT_SM --> FOR_SM
     FETCH_SM -->|ok| PARSE_XML["DOMParser.parseFromString(text, 'text/xml')"]
     PARSE_XML -->|parse error| NEXT_SM
-    PARSE_XML -->|ok| FOR_URL["For each &lt;url&gt; element …"]
-    FOR_URL --> CHECK_LOC{&lt;loc&gt; matches\nrequested URI?\n(trailing-slash tolerant)}
-    CHECK_LOC -->|no| NEXT_URL[next &lt;url&gt;]
+    PARSE_XML -->|ok| FOR_URL["For each url element in sitemap …"]
+    FOR_URL --> CHECK_LOC{"loc matches requested URI?\ntrailing-slash tolerant"}
+    CHECK_LOC -->|no| NEXT_URL[next url entry]
     NEXT_URL --> FOR_URL
-    CHECK_LOC -->|yes| FOR_XLINK["For each &lt;xhtml:link&gt; in matching &lt;url&gt;"]
+    CHECK_LOC -->|yes| FOR_XLINK["For each xhtml:link in matching url entry"]
     FOR_XLINK --> CHECK_REL{rel=describedby?\nhref present?\ntype is RDF or absent?}
     CHECK_REL -->|no| NEXT_XLINK[next xhtml:link]
     NEXT_XLINK --> FOR_XLINK
