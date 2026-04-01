@@ -29,6 +29,7 @@ graph TB
 
     subgraph "Return Type"
         H["ExtractedRDF\n• content: string\n• format: string\n• source: SourceEnum\n• url: string"]
+        H2["RDFOverview\n• found: ExtractedRDF[]\n• notFound: source[]\n• contentNegotiations: ContentNegotiationResult[]"]
     end
 
     A --> B
@@ -42,6 +43,7 @@ graph TB
     A --> F
     A --> G
     A --> H
+    A --> H2
 
     F --> B
     F --> B2
@@ -85,9 +87,18 @@ interface ExtractedRDF {
 #### `RDFOverview` interface (returned by `extractAllRDF`)
 
 ```typescript
+interface ContentNegotiationResult {
+  requestedMime: string;  // MIME type sent in the Accept header
+  responseMime:  string;  // Content-Type returned by the server
+  chars:         number;  // Length of the response body
+  isRdf:         boolean; // Whether the response is a known RDF serialization
+  url:           string;  // Request URL
+}
+
 interface RDFOverview {
-  found:    ExtractedRDF[];              // All successful hits across every strategy
-  notFound: Array<ExtractedRDF['source']>; // Strategies that yielded no RDF
+  found:                ExtractedRDF[];                    // All successful RDF hits
+  notFound:             Array<ExtractedRDF['source']>;     // Strategies that yielded nothing
+  contentNegotiations:  ContentNegotiationResult[];        // Per-MIME-type results for Strategy 1
 }
 ```
 
@@ -352,8 +363,15 @@ Example output:
 ```
 🔍 Exploring all RDF paths for: https://example.org/dataset
 
-  ✅ Strategy 1 — Content Negotiation
-       text/turtle  https://example.org/dataset  (4821 chars)
+  ✅ Strategy 1 — Content Negotiation (3 RDF format(s) found)
+       Requested MIME                →  Response MIME                  Chars
+       ──────────────────────────      ──────────────────────────      ─────
+       text/turtle                   →  text/turtle                       4,821  ✅
+       application/ld+json           →  application/ld+json               2,341  ✅
+       application/rdf+xml           →  text/html                        15,234  ❌
+       application/n-triples         →  application/n-triples             8,901  ✅
+       text/n3                       →  text/turtle                       4,821  ✅ (duplicate format)
+       application/n-quads           →  text/html                        15,234  ❌
   ✅ Strategy 2 — HTTP Link header (rel=describedby)
        text/turtle  https://example.org/dataset.ttl  (4821 chars)
   ❌ Strategy 3 — Linkset (rel=linkset)
@@ -362,8 +380,18 @@ Example output:
        application/ld+json  https://example.org/dataset  (312 chars)
   ❌ Strategy 6 — Sitemap signposting (robots.txt)
 
-📊 3 RDF source(s) found across 6 strategies tried.
+📋 Content Negotiation Overview (all MIME types):
+   text/turtle                →   4,821 chars  (text/turtle)             ✅ RDF
+   application/ld+json        →   2,341 chars  (application/ld+json)     ✅ RDF
+   application/rdf+xml        →  15,234 chars  (text/html)               ❌ not RDF
+   application/n-triples      →   8,901 chars  (application/n-triples)   ✅ RDF
+   text/n3                    →   4,821 chars  (text/turtle)             ✅ RDF
+   application/n-quads        →  15,234 chars  (text/html)               ❌ not RDF
+
+📊 3 unique RDF source(s) found across 6 strategies tried.
 ```
+
+> **Note:** `text/n3` returned `text/turtle` in the example above, which is the same format as the first request. The `found` array deduplicates by response format, so both requests count in `contentNegotiations` but only one entry appears in `found`.
 
 ### As a library — `extractAllRDF`
 
@@ -376,11 +404,19 @@ for (const rdf of overview.found) {
   console.log(rdf.source, rdf.format, rdf.url);
 }
 console.log('Not found via:', overview.notFound);
+
+// Content negotiation details (one entry per MIME type tried)
+for (const cn of overview.contentNegotiations) {
+  console.log(`${cn.requestedMime} → ${cn.responseMime} (${cn.chars} chars) ${cn.isRdf ? '✅' : '❌'}`);
+}
 ```
 
 ---
 
 ## Design Decisions
+
+### Per-MIME-type content negotiation in `--all` mode
+In the default `extractRDF()` mode, a single HTTP request is made with a combined `Accept` header listing all supported RDF MIME types. In `extractAllRDF()` (`--all` mode), each RDF MIME type is tried individually in its own HTTP request so that every possible server response is captured. Results are deduplicated (two requests returning the same format produce only one entry in `found`). Non-RDF responses are recorded in `contentNegotiations` with their character count, making it easy to see which MIME types the server does — and does not — support for the target resource.
 
 ### No external dependencies
 The module relies exclusively on Bun built-ins (`fetch`, `URL`, `DOMParser`, `Response`). This keeps deployment simple — no `node_modules`, no `bun install` required at runtime.

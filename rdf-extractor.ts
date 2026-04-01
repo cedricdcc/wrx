@@ -410,12 +410,32 @@ async function tryExtractFromSitemapAndDCAT(uri: string): Promise<ExtractedRDF |
   return null;
 }
 
+/** Result of a single per-MIME-type content negotiation attempt (used in --all mode) */
+export interface ContentNegotiationResult {
+  /** The MIME type requested in the Accept header */
+  requestedMime: string;
+  /** The Content-Type returned by the server */
+  responseMime: string;
+  /** Number of characters in the response body */
+  chars: number;
+  /** Whether the response Content-Type is a recognised RDF serialization */
+  isRdf: boolean;
+  /** The final URL after any redirects */
+  url: string;
+}
+
 /** Overview of all RDF sources discovered across every extraction strategy */
 export interface RDFOverview {
   /** All RDF sources that were successfully extracted */
   found: ExtractedRDF[];
   /** Names of strategies that were tried but yielded no RDF */
   notFound: Array<ExtractedRDF['source']>;
+  /**
+   * Per-MIME-type content negotiation results (one entry per MIME type tried).
+   * Populated by extractAllRDF(); includes both RDF and non-RDF responses so
+   * callers can see exactly what the server returned for each Accept value.
+   */
+  contentNegotiations: ContentNegotiationResult[];
 }
 
 /** Collect ALL RDF hits from a linkset (does not stop on first success) */
@@ -609,24 +629,61 @@ async function tryExtractAllFromSitemapAndDCAT(uri: string): Promise<ExtractedRD
 export async function extractAllRDF(uri: string): Promise<RDFOverview> {
   const found: ExtractedRDF[] = [];
   const notFound: Array<ExtractedRDF['source']> = [];
+  const contentNegotiations: ContentNegotiationResult[] = [];
 
-  // --- Strategy 1: Content Negotiation ---
-  let res: Response | null = null;
+  // --- Strategy 1: Content Negotiation (one request per RDF MIME type) ---
+  // We also make a "discovery" fetch using the combined Accept header to capture
+  // Link headers and the HTML body that feed into all subsequent strategies.
   let bodyText = '';
   let linkHeader: string | null = null;
+
   try {
-    res = await fetchRDF(uri);
-    const ct = baseMime(res.headers.get('content-type'));
-    linkHeader = res.headers.get('link');
-    if (isRDFMime(ct) && res.ok) {
-      found.push({ content: await res.text(), format: ct, source: 'content-negotiation', url: uri });
+    const discRes = await fetchRDF(uri);
+    linkHeader = discRes.headers.get('link');
+    const discCt = baseMime(discRes.headers.get('content-type'));
+    if (!isRDFMime(discCt) || !discRes.ok) {
+      try { bodyText = await discRes.text(); } catch { bodyText = ''; }
     } else {
-      notFound.push('content-negotiation');
-      try { bodyText = await res.text(); } catch { bodyText = ''; }
+      try { await discRes.text(); } catch { /* discard body */ }
     }
-  } catch {
-    notFound.push('content-negotiation');
+  } catch { /* ignore */ }
+
+  // Try each RDF MIME type individually; record the result regardless of what comes back.
+  const MIME_ORDER = [
+    'text/turtle',
+    'application/ld+json',
+    'application/rdf+xml',
+    'application/n-triples',
+    'text/n3',
+    'application/n-quads',
+  ];
+  let cnFound = false;
+  for (const mime of MIME_ORDER) {
+    try {
+      const cnRes = await fetch(uri, { headers: { Accept: mime }, redirect: 'follow' });
+      const cnCt = baseMime(cnRes.headers.get('content-type'));
+      const cnBody = await cnRes.text();
+      const isRdf = cnRes.ok && isRDFMime(cnCt);
+      contentNegotiations.push({
+        requestedMime: mime,
+        responseMime: cnCt || '(unknown)',
+        chars: cnBody.length,
+        isRdf,
+        url: cnRes.url || uri,
+      });
+      if (isRdf) {
+        // Deduplicate: skip if we already have a hit with the same format
+        const isDup = found.some(
+          (f) => f.source === 'content-negotiation' && f.format === cnCt
+        );
+        if (!isDup) {
+          found.push({ content: cnBody, format: cnCt, source: 'content-negotiation', url: uri });
+          cnFound = true;
+        }
+      }
+    } catch { /* skip this MIME type */ }
   }
+  if (!cnFound) notFound.push('content-negotiation');
 
   const htmlHints = bodyText
     ? extractHtmlHints(bodyText)
@@ -754,7 +811,7 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
     notFound.push('sitemap-signposting');
   }
 
-  return { found, notFound };
+  return { found, notFound, contentNegotiations };
 }
 
 /**
@@ -966,7 +1023,33 @@ if (import.meta.main) {
       stratNum++;
       const label = STRATEGY_LABELS[source];
       const hits = bySource.get(source) ?? [];
-      if (hits.length > 0) {
+
+      if (source === 'content-negotiation') {
+        // Show per-MIME-type negotiation results inline under Strategy 1
+        const rdfHits = overview.contentNegotiations.filter((r) => r.isRdf);
+        if (rdfHits.length > 0) {
+          console.log(`  ✅ Strategy ${stratNum} — ${label} (${rdfHits.length} RDF format(s) found)`);
+        } else {
+          console.log(`  ❌ Strategy ${stratNum} — ${label}`);
+        }
+        // Column widths for alignment
+        const reqW = overview.contentNegotiations.length > 0
+          ? Math.max(...overview.contentNegotiations.map((r) => r.requestedMime.length), 'Requested MIME'.length)
+          : 'Requested MIME'.length;
+        const resW = overview.contentNegotiations.length > 0
+          ? Math.max(...overview.contentNegotiations.map((r) => r.responseMime.length), 'Response MIME'.length)
+          : 'Response MIME'.length;
+        console.log(
+          `       ${'Requested MIME'.padEnd(reqW)}  →  ${'Response MIME'.padEnd(resW)}  Chars`
+        );
+        console.log(`       ${'─'.repeat(reqW)}     ${'─'.repeat(resW)}  ─────`);
+        for (const cn of overview.contentNegotiations) {
+          const flag = cn.isRdf ? '✅' : '❌';
+          console.log(
+            `       ${cn.requestedMime.padEnd(reqW)}  →  ${cn.responseMime.padEnd(resW)}  ${cn.chars.toLocaleString().padStart(7)}  ${flag}`
+          );
+        }
+      } else if (hits.length > 0) {
         console.log(`  ✅ Strategy ${stratNum} — ${label}`);
         for (const hit of hits) {
           console.log(`       ${hit.format}  ${hit.url}  (${hit.content.length} chars)`);
@@ -977,8 +1060,17 @@ if (import.meta.main) {
     }
 
     console.log('');
+    // Summary overview: content negotiation character counts
+    if (overview.contentNegotiations.length > 0) {
+      console.log('📋 Content Negotiation Overview (all MIME types):');
+      for (const cn of overview.contentNegotiations) {
+        const flag = cn.isRdf ? '✅ RDF' : '❌ not RDF';
+        console.log(`   ${cn.requestedMime.padEnd(26)} → ${cn.chars.toLocaleString().padStart(7)} chars  (${cn.responseMime})  ${flag}`);
+      }
+      console.log('');
+    }
     if (overview.found.length > 0) {
-      console.log(`📊 ${overview.found.length} RDF source(s) found across ${allSources.length} strategies tried.`);
+      console.log(`📊 ${overview.found.length} unique RDF source(s) found across ${allSources.length} strategies tried.`);
     } else {
       console.log('📊 No RDF found after exploring all strategies.');
     }
