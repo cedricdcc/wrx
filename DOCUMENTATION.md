@@ -16,10 +16,14 @@ graph TB
 
     subgraph "Internal Helpers"
         B["fetchRDF(url)\nSends Accept header for RDF MIME types"]
+        B2["fetchDescribedBy(url, declaredType?)\nType-aware fetch — puts declared MIME first in Accept"]
         C["parseLinkHeader(header)\nParses HTTP Link / RFC 9264 text linksets"]
         D["baseMime(contentType)\nStrips charset/params from Content-Type"]
         E["isRDFMime(mime)\nChecks MIME against known RDF serializations"]
-        F["tryExtractFromLinkset(url, base)\nResolves application/linkset+json or application/linkset"]
+        E2["looksLikeJsonLd(text)\nDetects JSON-LD markers in a JSON body"]
+        E3["resolveRdfFormat(ct, declared, body)\nReturns effective RDF MIME, trusting declared type\nwhen server returns application/json for JSON-LD"]
+        E4["normUri(u)\nLower-cases and strips trailing slash for URI comparison"]
+        F["tryExtractFromLinkset(url, base)\nResolves application/linkset+json or application/linkset\nwith anchor matching and cite-as fallback"]
         G["tryExtractFromSitemapAndDCAT(uri)\nrobots.txt → sitemap.xml → xhtml:link signposting"]
     end
 
@@ -28,17 +32,25 @@ graph TB
     end
 
     A --> B
+    A --> B2
     A --> C
     A --> D
     A --> E
+    A --> E2
+    A --> E3
+    A --> E4
     A --> F
     A --> G
     A --> H
 
     F --> B
+    F --> B2
     F --> C
     F --> D
     F --> E
+    F --> E2
+    F --> E3
+    F --> E4
     G --> B
     G --> D
     G --> E
@@ -49,8 +61,9 @@ graph TB
 | Type / Constant | Purpose |
 |---|---|
 | `ExtractedRDF` | The result object returned on success |
+| `RDFOverview` | Returned by `extractAllRDF()` — all hits + strategies that found nothing |
 | `RDF_MIMES` | `Set<string>` of all recognised RDF MIME types |
-| `RDF_ACCEPT` | The `Accept` header value sent during content negotiation |
+| `RDF_ACCEPT` | The `Accept` header value sent during generic content negotiation |
 
 #### `ExtractedRDF` interface
 
@@ -66,6 +79,15 @@ interface ExtractedRDF {
     | 'linkset'
     | 'sitemap-signposting';
   url: string;       // Final URL the RDF was fetched from
+}
+```
+
+#### `RDFOverview` interface (returned by `extractAllRDF`)
+
+```typescript
+interface RDFOverview {
+  found:    ExtractedRDF[];              // All successful hits across every strategy
+  notFound: Array<ExtractedRDF['source']>; // Strategies that yielded no RDF
 }
 ```
 
@@ -149,7 +171,7 @@ flowchart TD
 
 ## Linkset Resolution — Detail
 
-`tryExtractFromLinkset()` is called by Steps 2b and 3b above. It handles **two** RFC 9264 serialisations.
+`tryExtractFromLinkset()` is called by Steps 2b and 3b above (linkset discovery via HTTP `Link` header and via HTML `<link rel="linkset">` element). It handles **two** RFC 9264 serialisations and applies FAIR Signposting best practices (anchor matching, type-aware fetch, JSON-LD trust, `cite-as` fallback) to maximise compatibility with InvenioRDM / Zenodo deployments.
 
 ```mermaid
 flowchart TD
@@ -158,36 +180,57 @@ flowchart TD
     FETCH_LS -->|error or non-200| LS_NULL([return null])
     FETCH_LS -->|200 OK| CHECK_CT{Content-Type?}
 
-    CHECK_CT -->|application/linkset+json| JSON_PATH
+    CHECK_CT -->|application/linkset+json\nor application/json| JSON_PATH
     CHECK_CT -->|application/linkset| TEXT_PATH
     CHECK_CT -->|other| LS_NULL2([return null])
 
-    subgraph JSON_PATH ["JSON Linkset (application/linkset+json)"]
-        J1["Parse JSON → data.linkset[]"]
-        J2["For each context object:\nCheck rel: describedby and rel: profile arrays"]
-        J3{target.href present?\ntarget.type is RDF or absent?}
-        J4["fetchRDF(target.href)\nCheck Content-Type → is RDF?"]
-        J5(["`return ExtractedRDF\nsource: 'linkset'`"])
-        J1 --> J2 --> J3
-        J3 -->|yes| J4 --> J5
-        J3 -->|no| J2
+    subgraph JSON_PATH ["JSON Linkset (application/linkset+json or application/json with linkset array)"]
+        J1["Parse JSON\nVerify body has linkset array"]
+        J_ANCHOR{Any entry whose\nanchor matches baseUri?}
+        J_SEL["Use matching entries\nor all entries if none match"]
+        J2["For each context entry:\nCheck describedby and profile arrays"]
+        J3{target.href present?\nDeclared type is RDF or absent?}
+        J4["fetchDescribedBy(href, declaredType)\nType-aware: declared MIME first in Accept"]
+        J5["resolveRdfFormat(responseCt, declaredType, body)\nTrust declared type if server returns\napplication/json but body looks like JSON-LD"]
+        J6{Effective format\nis RDF?}
+        J7(["`return ExtractedRDF\nsource: 'linkset'`"])
+        JCA["cite-as fallback:\nfetchRDF(citeAs.href)\nContent-negotiate via DOI URL"]
+        JCA2{RDF MIME\nreturned?}
+        JCA3(["`return ExtractedRDF\nsource: 'linkset'`"])
+        J1 --> J_ANCHOR --> J_SEL --> J2 --> J3
+        J3 -->|yes| J4 --> J5 --> J6
+        J6 -->|yes| J7
+        J6 -->|no| J2
+        J3 -->|no, or all targets exhausted| JCA --> JCA2
+        JCA2 -->|yes| JCA3
+        JCA2 -->|no| LS_NULL3([return null])
     end
 
     subgraph TEXT_PATH ["Text Linkset (application/linkset)"]
         T1["Read body, normalise whitespace"]
         T2["parseLinkHeader() → links[]"]
+        T_ANCHOR{Link has anchor?\nDoes it match baseUri?}
         T3{rel=describedby\nor rel=profile?}
-        T4["fetchRDF(link.url)\nCheck Content-Type → is RDF?"]
-        T5(["`return ExtractedRDF\nsource: 'linkset'`"])
-        T1 --> T2 --> T3
-        T3 -->|yes| T4 --> T5
-        T3 -->|no| T3
+        T4["fetchDescribedBy(url, declaredType)\nType-aware fetch"]
+        T5["resolveRdfFormat(responseCt, declaredType, body)"]
+        T6{Effective format\nis RDF?}
+        T7(["`return ExtractedRDF\nsource: 'linkset'`"])
+        T1 --> T2 --> T_ANCHOR
+        T_ANCHOR -->|no anchor, or anchor matches| T3
+        T_ANCHOR -->|anchor does not match| T2
+        T3 -->|yes| T4 --> T5 --> T6
+        T6 -->|yes| T7
+        T6 -->|no| T3
+        T3 -->|no matching links| LS_NULL4([return null])
     end
 
-    style J5 fill:#2d6a4f,color:#fff
-    style T5 fill:#2d6a4f,color:#fff
+    style J7 fill:#2d6a4f,color:#fff
+    style JCA3 fill:#2d6a4f,color:#fff
+    style T7 fill:#2d6a4f,color:#fff
     style LS_NULL fill:#9d0208,color:#fff
     style LS_NULL2 fill:#9d0208,color:#fff
+    style LS_NULL3 fill:#9d0208,color:#fff
+    style LS_NULL4 fill:#9d0208,color:#fff
 ```
 
 ---
@@ -353,5 +396,20 @@ Both serialisations are supported:
 - `application/linkset+json` — JSON format, checks `describedby` and `profile` relation arrays
 - `application/linkset` — text format, treated as a Link header and parsed with `parseLinkHeader()`
 
+### RFC 9264 anchor matching (InvenioRDM / Zenodo)
+A linkset document may describe multiple resources (e.g. the landing page and each of its files). Per RFC 9264 §4.2, the entry whose `anchor` URI matches the requested URI should be preferred over the others. `normUri()` normalises both URIs (lowercase, strip trailing slash) before comparing, so `https://zenodo.org/records/42` and `https://zenodo.org/records/42/` are treated as equivalent. When no entry's anchor matches, all entries are iterated as a fallback to support servers that omit the `anchor` field.
+
+### Type-aware `fetchDescribedBy()` (InvenioRDM / Zenodo)
+InvenioRDM/Zenodo linkset entries declare a specific RDF type for their `describedby` targets (e.g. `"type": "application/ld+json"`). The `fetchDescribedBy()` helper builds an `Accept` header that places the declared MIME type at `q=1.0` and all other RDF types below it, maximising the chance the server returns the format it advertises without the consumer having to know the server's routing logic.
+
+### JSON-LD trust via `resolveRdfFormat()` and `looksLikeJsonLd()`
+Some InvenioRDM deployments return `Content-Type: application/json` even when the body is JSON-LD. `looksLikeJsonLd()` checks for JSON-LD structural markers (`@context`, `@type`, `@graph`) at the top level of the parsed body (including top-level arrays, which are valid JSON-LD). `resolveRdfFormat()` uses this to trust the linkset's declared MIME type in these cases, setting `format` to `application/ld+json` rather than `application/json`.
+
+### `application/json` linkset body fallback
+For the same reason, if a server returns `Content-Type: application/json` for the linkset request itself but the body contains a top-level `linkset` array, the body is parsed and processed as `application/linkset+json`.
+
+### `cite-as` content-negotiation fallback
+When a linkset entry's `describedby`/`profile` targets all fail to return RDF, the module tries RDF content negotiation on any `cite-as` URI in the same entry (typically a DOI). This catches cases where a DOI resolves with proper `Accept`-based negotiation even though the direct metadata URL is inaccessible.
+
 ### Trailing-slash normalisation
-URI comparison in the sitemap strategy accepts `https://example.org/foo`, `https://example.org/foo/` and their reverse without requiring exact equality.
+URI comparison in the sitemap strategy accepts `https://example.org/foo`, `https://example.org/foo/` and their reverse without requiring exact equality. The same `normUri()` helper is used for anchor matching in the linkset strategy.
