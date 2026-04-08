@@ -224,12 +224,12 @@ function normUri(u: string): string {
   return u.toLowerCase().replace(/\/$/, '');
 }
 
-/** Try to extract RDF from a linkset (application/linkset+json or application/linkset) */
+/** Try to extract RDF from a linkset (application/linkset+json, application/ld+json with linkset, or application/linkset text) */
 async function tryExtractFromLinkset(
   linksetUrl: string,
   baseUri: string
 ): Promise<ExtractedRDF | null> {
-  const acceptLinkset = 'application/linkset+json;q=1.0, application/linkset;q=0.9';
+  const acceptLinkset = 'application/linkset+json;q=1.0, application/ld+json;q=0.9, application/linkset;q=0.8';
   let res: Response;
   try {
     res = await fetch(linksetUrl, { headers: { Accept: acceptLinkset }, redirect: 'follow' });
@@ -242,7 +242,9 @@ async function tryExtractFromLinkset(
 
   // Handle application/linkset+json.
   // Also accept application/json as a fallback for servers that don't set the exact CT.
-  if (ct === 'application/linkset+json' || ct === 'application/json') {
+  // Also accept application/ld+json when the body carries a top-level "linkset" array
+  // (RFC 9264 Appendix A JSON-LD linkset representation).
+  if (ct === 'application/linkset+json' || ct === 'application/json' || ct === 'application/ld+json') {
     let data: unknown;
     try {
       data = await res.json();
@@ -444,7 +446,7 @@ async function tryExtractAllFromLinkset(
   baseUri: string
 ): Promise<ExtractedRDF[]> {
   const results: ExtractedRDF[] = [];
-  const acceptLinkset = 'application/linkset+json;q=1.0, application/linkset;q=0.9';
+  const acceptLinkset = 'application/linkset+json;q=1.0, application/ld+json;q=0.9, application/linkset;q=0.8';
   let res: Response;
   try {
     res = await fetch(linksetUrl, { headers: { Accept: acceptLinkset }, redirect: 'follow' });
@@ -455,7 +457,7 @@ async function tryExtractAllFromLinkset(
 
   const ct = baseMime(res.headers.get('content-type'));
 
-  if (ct === 'application/linkset+json' || ct === 'application/json') {
+  if (ct === 'application/linkset+json' || ct === 'application/json' || ct === 'application/ld+json') {
     let data: unknown;
     try {
       data = await res.json();
@@ -718,13 +720,22 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
   }
   if (!headerDescribedByFound) notFound.push('signposting-link-header');
 
-  // --- Strategy 3: HTTP Link header — rel=linkset ---
+  // --- Strategy 3: HTTP Link header — rel=linkset + URI content negotiation ---
   const headerLinksets = links.filter((l) => l['rel'] === 'linkset');
   let headerLinksetFound = false;
   for (const ls of headerLinksets) {
     const lsUrl = new URL(ls['url'], uri).toString();
     const hits = await tryExtractAllFromLinkset(lsUrl, uri);
     if (hits.length > 0) { found.push(...hits); headerLinksetFound = true; }
+  }
+  // Also try the URI itself as a linkset endpoint via content negotiation (RFC 9264 §4).
+  // Skip if the URI was already tried as a Link-header linkset URL.
+  const headerLinksetUriNorms = new Set(
+    headerLinksets.map((ls) => normUri(new URL(ls['url'], uri).toString()))
+  );
+  if (!headerLinksetUriNorms.has(normUri(uri))) {
+    const connegHits = await tryExtractAllFromLinkset(uri, uri);
+    if (connegHits.length > 0) { found.push(...connegHits); headerLinksetFound = true; }
   }
   if (!headerLinksetFound) notFound.push('linkset');
 
@@ -769,10 +780,12 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
   if (!htmlDescribedByFound) notFound.push('signposting-html-link');
 
   // --- Strategy 5: HTML link[rel=linkset] ---
-  // (deduplicated against header linksets to avoid double counting)
+  // (deduplicated against header linksets and the conneg-tried URI to avoid double counting)
   const headerLinksetUrls = new Set(
     headerLinksets.map((ls) => new URL(ls['url'], uri).toString())
   );
+  // Mark the URI itself as already tried (we tried it via conneg in Strategy 3 above)
+  headerLinksetUrls.add(uri);
   let htmlLinksetFound = false;
   for (const href of htmlLinksets) {
     const lsUrl = new URL(href, uri).toString();
@@ -888,6 +901,17 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
     const lsUrl = new URL(ls['url'], uri).toString();
     const rdf = await tryExtractFromLinkset(lsUrl, uri);
     if (rdf) return rdf;
+  }
+
+  // Also try the URI itself as a linkset endpoint via content negotiation (RFC 9264 §4).
+  // This handles servers that serve the linkset at the resource URL directly
+  // when requested with the appropriate Accept header (not only via Link: rel=linkset header).
+  const headerLinksetUriNorms = new Set(
+    linksetFromHeader.map((ls) => normUri(new URL(ls['url'], uri).toString()))
+  );
+  if (!headerLinksetUriNorms.has(normUri(uri))) {
+    const connegLinkset = await tryExtractFromLinkset(uri, uri);
+    if (connegLinkset) return connegLinkset;
   }
 
   // 3. HTML FAIR signposting + embedded RDF scripts

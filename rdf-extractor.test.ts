@@ -145,6 +145,164 @@ describe('extractRDF', () => {
     expect(result?.content).toBe(JSONLD_BODY);
   });
 
+  // RFC 9264 Appendix A: JSON-LD linkset representation.
+  // The linkset is served as application/ld+json with a top-level "linkset" array and @context.
+  test('handles JSON-LD linkset format (application/ld+json with @context and linkset array)', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const LANDING = 'https://repo.example/records/77';
+    const API = 'https://repo.example/api/records/77';
+
+    const TURTLE_BODY = '@prefix schema: <https://schema.org/> . <> a schema:Dataset .';
+
+    const JSONLD_LINKSET_BODY = JSON.stringify({
+      '@context': { linkset: 'https://www.iana.org/assignments/link-relations/linkset' },
+      linkset: [
+        {
+          anchor: LANDING,
+          describedby: [{ href: `${LANDING}.ttl`, type: 'text/turtle' }],
+        },
+      ],
+    });
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
+
+      if (url === LANDING) {
+        return new Response('<html><body>Landing</body></html>', {
+          status: 200,
+          headers: {
+            'content-type': 'text/html',
+            link: `<${API}>; rel="linkset"; type="application/ld+json"`,
+          },
+        });
+      }
+      if (url === API && accept.includes('application/linkset+json')) {
+        return new Response(JSONLD_LINKSET_BODY, {
+          status: 200,
+          headers: { 'content-type': 'application/ld+json' },
+        });
+      }
+      if (url === `${LANDING}.ttl`) {
+        return new Response(TURTLE_BODY, {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(LANDING);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('linkset');
+    expect(result?.format).toBe('text/turtle');
+    expect(result?.content).toBe(TURTLE_BODY);
+  });
+
+  // RFC 9264 §4.1: application/linkset text format.
+  // The linkset is served as UTF-8 text with Link-style entries.
+  test('handles application/linkset text format', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const LANDING = 'https://data.example/resource/55';
+    const LINKSET_URL = 'https://data.example/resource/55.linkset';
+
+    const TURTLE_BODY = '@prefix dct: <http://purl.org/dc/terms/> . <> a dct:Dataset .';
+
+    // RFC 9264 §4.1 text linkset: Link-style entries with anchor
+    const TEXT_LINKSET =
+      `<${LANDING}.ttl> ; rel="describedby" ; type="text/turtle" ; anchor="${LANDING}" ,\n` +
+      `<https://schema.org/Dataset> ; rel="type" ; anchor="${LANDING}"`;
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
+
+      if (url === LANDING) {
+        return new Response('<html><body>Resource</body></html>', {
+          status: 200,
+          headers: {
+            'content-type': 'text/html',
+            link: `<${LINKSET_URL}>; rel="linkset"; type="application/linkset"`,
+          },
+        });
+      }
+      if (url === LINKSET_URL && accept.includes('application/linkset+json')) {
+        return new Response(TEXT_LINKSET, {
+          status: 200,
+          headers: { 'content-type': 'application/linkset' },
+        });
+      }
+      if (url === `${LANDING}.ttl`) {
+        return new Response(TURTLE_BODY, {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(LANDING);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('linkset');
+    expect(result?.format).toBe('text/turtle');
+    expect(result?.content).toBe(TURTLE_BODY);
+  });
+
+  // RFC 9264 §4: Linkset discovery via URI content negotiation.
+  // No Link header — the URI itself serves the linkset when asked with the right Accept.
+  test('discovers linkset via URI content negotiation (no Link header required)', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const LANDING = 'https://data.example/resource/88';
+    const TURTLE_BODY = '@prefix owl: <http://www.w3.org/2002/07/owl#> . <> a owl:Ontology .';
+
+    const LINKSET_BODY = JSON.stringify({
+      linkset: [
+        {
+          anchor: LANDING,
+          describedby: [{ href: `${LANDING}.ttl`, type: 'text/turtle' }],
+        },
+      ],
+    });
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
+
+      if (url === LANDING) {
+        // Returns HTML for RDF Accept headers, linkset for linkset Accept headers
+        if (accept.includes('application/linkset+json')) {
+          return new Response(LINKSET_BODY, {
+            status: 200,
+            headers: { 'content-type': 'application/linkset+json' },
+          });
+        }
+        return new Response('<html><body>Resource page</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        });
+      }
+      if (url === `${LANDING}.ttl`) {
+        return new Response(TURTLE_BODY, {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(LANDING);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('linkset');
+    expect(result?.format).toBe('text/turtle');
+    expect(result?.content).toBe(TURTLE_BODY);
+  });
+
   // Some servers return Content-Type: application/json even for JSON-LD payloads.
   // The linkset's declared type should be trusted when the body looks like JSON-LD.
   test('trusts linkset declared type when server returns application/json for JSON-LD', async () => {
