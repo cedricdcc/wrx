@@ -365,4 +365,164 @@ describe('extractRDF', () => {
     // Format should be the linkset-declared type, not application/json
     expect(result?.format).toBe('application/ld+json');
   });
+
+  // GS1 Digital Link pattern: Link header points to ?linkType=all linkset URL.
+  // The linkset URL returns a linkset+json with a describedby entry pointing back
+  // to the original URI for the RDF representation.
+  test('handles GS1 Digital Link pattern (Link: rel=linkset ?linkType=all)', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const PRODUCT_URI = 'https://id.gs1.org/01/09506000134352';
+    const LINKSET_URL = `${PRODUCT_URI}?linkType=all`;
+    const JSONLD_BODY = JSON.stringify({
+      '@context': 'https://schema.org/',
+      '@type': 'Product',
+      name: 'Example Product',
+    });
+
+    const LINKSET_BODY = JSON.stringify({
+      linkset: [
+        {
+          anchor: PRODUCT_URI,
+          describedby: [{ href: PRODUCT_URI, type: 'application/ld+json' }],
+          type: [{ href: 'https://schema.org/Product' }],
+        },
+      ],
+    });
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
+
+      if (url === PRODUCT_URI) {
+        if (accept.includes('application/linkset+json')) {
+          // Return linkset when asked for it (conneg)
+          return new Response(LINKSET_BODY, {
+            status: 200,
+            headers: { 'content-type': 'application/linkset+json' },
+          });
+        }
+        if (accept.includes('application/ld+json')) {
+          return new Response(JSONLD_BODY, {
+            status: 200,
+            headers: { 'content-type': 'application/ld+json' },
+          });
+        }
+        // Default: HTML landing page with Link header pointing to linkset
+        return new Response('<html><body>Product Page</body></html>', {
+          status: 200,
+          headers: {
+            'content-type': 'text/html',
+            link: `<${LINKSET_URL}>; rel="linkset"; type="application/linkset+json"`,
+          },
+        });
+      }
+      if (url === LINKSET_URL && accept.includes('application/linkset+json')) {
+        return new Response(LINKSET_BODY, {
+          status: 200,
+          headers: { 'content-type': 'application/linkset+json' },
+        });
+      }
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(PRODUCT_URI);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('linkset');
+    expect(result?.format).toBe('application/ld+json');
+    expect(result?.content).toBe(JSONLD_BODY);
+  });
+
+  // rel=profile with a linkset MIME type should be treated as a linkset URL.
+  // This is equivalent to rel=linkset per RFC 9264 / GS1 Digital Link profile usage.
+  test('treats rel=profile with linkset MIME type as a linkset source', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const LANDING = 'https://data.example/item/42';
+    const PROFILE_LINKSET_URL = 'https://data.example/item/42.linkset.json';
+    const TURTLE_BODY = '@prefix skos: <http://www.w3.org/2004/02/skos/core#> . <> a skos:Concept .';
+
+    const LINKSET_BODY = JSON.stringify({
+      linkset: [
+        {
+          anchor: LANDING,
+          describedby: [{ href: `${LANDING}.ttl`, type: 'text/turtle' }],
+        },
+      ],
+    });
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
+
+      if (url === LANDING) {
+        return new Response('<html><body>Item</body></html>', {
+          status: 200,
+          headers: {
+            'content-type': 'text/html',
+            // Server advertises the linkset via rel=profile with linkset MIME type
+            link: `<${PROFILE_LINKSET_URL}>; rel="profile"; type="application/linkset+json"`,
+          },
+        });
+      }
+      if (url === PROFILE_LINKSET_URL && accept.includes('application/linkset+json')) {
+        return new Response(LINKSET_BODY, {
+          status: 200,
+          headers: { 'content-type': 'application/linkset+json' },
+        });
+      }
+      if (url === `${LANDING}.ttl`) {
+        return new Response(TURTLE_BODY, {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(LANDING);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('linkset');
+    expect(result?.format).toBe('text/turtle');
+    expect(result?.content).toBe(TURTLE_BODY);
+  });
+
+  // rel=profile with an RDF MIME type should be treated as a describedby URL.
+  test('treats rel=profile with RDF MIME type as a describedby source', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const LANDING = 'https://data.example/concept/77';
+    const TURTLE_BODY = '@prefix owl: <http://www.w3.org/2002/07/owl#> . <> a owl:Class .';
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === LANDING) {
+        return new Response('<html><body>Concept</body></html>', {
+          status: 200,
+          headers: {
+            'content-type': 'text/html',
+            // Server advertises the RDF description via rel=profile with RDF MIME type
+            link: `<${LANDING}.ttl>; rel="profile"; type="text/turtle"`,
+          },
+        });
+      }
+      if (url === `${LANDING}.ttl`) {
+        return new Response(TURTLE_BODY, {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(LANDING);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('signposting-link-header');
+    expect(result?.format).toBe('text/turtle');
+    expect(result?.content).toBe(TURTLE_BODY);
+  });
 });

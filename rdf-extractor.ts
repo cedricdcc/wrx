@@ -73,6 +73,12 @@ function isRDFMime(mime: string): boolean {
   return RDF_MIMES.has(mime.toLowerCase().trim());
 }
 
+/** Check if a MIME type is a linkset format */
+function isLinksetMime(mime: string): boolean {
+  const m = mime.toLowerCase().trim();
+  return m === 'application/linkset+json' || m === 'application/linkset';
+}
+
 /** Extract the base MIME type (before any parameters) from a Content-Type header value */
 function baseMime(contentType: string | null): string {
   if (!contentType) return '';
@@ -702,12 +708,18 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
 
   const links = parseLinkHeader(linkHeader);
 
-  // --- Strategy 2: HTTP Link header — rel=describedby ---
+  // --- Strategy 2: HTTP Link header — rel=describedby + rel=profile (RDF) ---
   const headerDescribedBy = links.filter(
     (l) => l['rel'] === 'describedby' && (!l['type'] || isRDFMime(l['type']))
   );
+  // Also collect rel=profile with RDF MIME type (or no type) as describedby equivalents
+  const profileLinks = links.filter((l) => l['rel'] === 'profile');
+  const headerDescribedByAll = [
+    ...headerDescribedBy,
+    ...profileLinks.filter((pl) => !pl['type'] || isRDFMime(pl['type'])),
+  ];
   let headerDescribedByFound = false;
-  for (const link of headerDescribedBy) {
+  for (const link of headerDescribedByAll) {
     const metaUrl = new URL(link['url'], uri).toString();
     try {
       const metaRes = await fetchRDF(metaUrl);
@@ -720,10 +732,20 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
   }
   if (!headerDescribedByFound) notFound.push('signposting-link-header');
 
-  // --- Strategy 3: HTTP Link header — rel=linkset + URI content negotiation ---
+  // --- Strategy 3: HTTP Link header — rel=linkset + rel=profile (linkset) + URI content negotiation ---
   const headerLinksets = links.filter((l) => l['rel'] === 'linkset');
+  // Also treat rel=profile with linkset MIME type as equivalent linkset sources.
+  // Deduplicate: if a URL appears in both rel=linkset and rel=profile, try it once.
+  const headerLinksetNorms = new Set(
+    headerLinksets.map((ls) => normUri(new URL(ls['url'], uri).toString()))
+  );
+  const profileLinksetLinks = profileLinks.filter(
+    (pl) => pl['type'] && isLinksetMime(pl['type']) &&
+    !headerLinksetNorms.has(normUri(new URL(pl['url'], uri).toString()))
+  );
+  const allLinksetHeaderLinks = [...headerLinksets, ...profileLinksetLinks];
   let headerLinksetFound = false;
-  for (const ls of headerLinksets) {
+  for (const ls of allLinksetHeaderLinks) {
     const lsUrl = new URL(ls['url'], uri).toString();
     const hits = await tryExtractAllFromLinkset(lsUrl, uri);
     if (hits.length > 0) { found.push(...hits); headerLinksetFound = true; }
@@ -731,7 +753,7 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
   // Also try the URI itself as a linkset endpoint via content negotiation (RFC 9264 §4).
   // Skip if the URI was already tried as a Link-header linkset URL.
   const headerLinksetUriNorms = new Set(
-    headerLinksets.map((ls) => normUri(new URL(ls['url'], uri).toString()))
+    allLinksetHeaderLinks.map((ls) => normUri(new URL(ls['url'], uri).toString()))
   );
   if (!headerLinksetUriNorms.has(normUri(uri))) {
     const connegHits = await tryExtractAllFromLinkset(uri, uri);
@@ -780,9 +802,9 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
   if (!htmlDescribedByFound) notFound.push('signposting-html-link');
 
   // --- Strategy 5: HTML link[rel=linkset] ---
-  // (deduplicated against header linksets and the conneg-tried URI to avoid double counting)
+  // (deduplicated against header linksets, profile linkset links, and the conneg-tried URI)
   const headerLinksetUrls = new Set(
-    headerLinksets.map((ls) => new URL(ls['url'], uri).toString())
+    allLinksetHeaderLinks.map((ls) => new URL(ls['url'], uri).toString())
   );
   // Mark the URI itself as already tried (we tried it via conneg in Strategy 3 above)
   headerLinksetUrls.add(uri);
@@ -895,21 +917,54 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
     }
   }
 
-  // Linkset from Link header
+  // Linkset from Link header (rel=linkset) plus rel=profile with linkset MIME type.
+  // These are treated equivalently: both point to a linkset resource.
   const linksetFromHeader = links.filter((l) => l['rel'] === 'linkset');
-  for (const ls of linksetFromHeader) {
+  const profileLinks = links.filter((l) => l['rel'] === 'profile');
+  const profileLinksetLinks = profileLinks.filter((pl) => pl['type'] && isLinksetMime(pl['type']));
+  // Merge and deduplicate by normalised URL so a URL advertised via both rels is only tried once.
+  const linksetFromHeaderNorms = new Set(
+    linksetFromHeader.map((ls) => normUri(new URL(ls['url'], uri).toString()))
+  );
+  const allLinksetLinks = [
+    ...linksetFromHeader,
+    ...profileLinksetLinks.filter(
+      (pl) => !linksetFromHeaderNorms.has(normUri(new URL(pl['url'], uri).toString()))
+    ),
+  ];
+  for (const ls of allLinksetLinks) {
     const lsUrl = new URL(ls['url'], uri).toString();
     const rdf = await tryExtractFromLinkset(lsUrl, uri);
     if (rdf) return rdf;
   }
 
-  // Also try the URI itself as a linkset endpoint via content negotiation (RFC 9264 §4).
-  // This handles servers that serve the linkset at the resource URL directly
-  // when requested with the appropriate Accept header (not only via Link: rel=linkset header).
-  const headerLinksetUriNorms = new Set(
-    linksetFromHeader.map((ls) => normUri(new URL(ls['url'], uri).toString()))
+  // rel=profile with RDF MIME type (or no type) → treat as a describedby source.
+  const profileDescribedBy = profileLinks.filter(
+    (pl) => !pl['type'] || isRDFMime(pl['type'])
   );
-  if (!headerLinksetUriNorms.has(normUri(uri))) {
+  for (const pl of profileDescribedBy) {
+    const profileUrl = new URL(pl['url'], uri).toString();
+    try {
+      const metaRes = await fetchRDF(profileUrl);
+      const metaCt = baseMime(metaRes.headers.get('content-type'));
+      if (isRDFMime(metaCt) && metaRes.ok) {
+        return {
+          content: await metaRes.text(),
+          format: metaCt,
+          source: 'signposting-link-header',
+          url: profileUrl,
+        };
+      }
+    } catch { /* skip */ }
+  }
+
+  // Also try the URI itself as a linkset endpoint via content negotiation (RFC 9264 §4).
+  // This handles servers that serve the linkset at the resource URL directly when requested
+  // with the appropriate Accept header (not only via Link: rel=linkset / rel=profile header).
+  const triedLinksetNorms = new Set(
+    allLinksetLinks.map((ls) => normUri(new URL(ls['url'], uri).toString()))
+  );
+  if (!triedLinksetNorms.has(normUri(uri))) {
     const connegLinkset = await tryExtractFromLinkset(uri, uri);
     if (connegLinkset) return connegLinkset;
   }
