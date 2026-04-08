@@ -1,0 +1,44 @@
+{
+  "name": "uri_gator",
+  "version": "0.1.0",
+  "description": "Bun TypeScript module for web resource extraction and RDF metadata discovery using cascading strategies.",
+  "module": "./wrx.js",
+  "types": "./wrx.ts",
+  "exports": {
+    ".": "./wrx.js"
+  },
+  "type": "module",
+  "private": false,
+  "files": [
+    "wrx.js",
+    "wrx.ts",
+    "bun-globals.d.ts",
+    "README.md",
+    "DOCUMENTATION.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cedricdcc/uri_gator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cedricdcc/uri_gator/issues"
+  },
+  "homepage": "https://github.com/cedricdcc/uri_gator#readme",
+  "keywords": [
+    "rdf",
+    "linked-data",
+    "metadata",
+    "signposting",
+    "bun",
+    "typescript"
+  ],
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
