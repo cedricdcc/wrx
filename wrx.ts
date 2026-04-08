@@ -1,6 +1,6 @@
-// rdf-extractor.ts
-// TypeScript module for Bun to extract RDF from a URI following the specified strategy.
-// Run with: bun run rdf-extractor.ts (or import the function in your Bun project)
+// wrx.ts
+// TypeScript module for Bun to extract web resources and RDF metadata from a URI using cascading discovery.
+// Run with: bun run wrx.js (or import the function in your Bun project)
 // No external dependencies — uses only built-in Bun/fetch + DOMParser (available in Bun).
 
 export interface ExtractedRDF {
@@ -850,7 +850,7 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
 }
 
 /**
- * Main entry point: tries to extract RDF following the exact strategy you described.
+ * Main entry point: tries to extract RDF using the cascading discovery strategy.
  * Returns the first successful RDF or null if nothing was found.
  */
 export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
@@ -1055,15 +1055,14 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
 
 // Optional CLI for quick testing
 // Usage:
-//   bun run rdf-extractor.ts <URI>          — return first RDF found
-//   bun run rdf-extractor.ts --all <URI>    — explore all paths and print overview
-if (import.meta.main) {
-  const args = process.argv.slice(2);
+//   bun run wrx.js <URI>          — return first RDF found
+//   bun run wrx.js --all <URI>    — explore all paths and print overview
+export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise<void> {
   const allMode = args.includes('--all');
   const url = args.find((a: string) => a !== '--all');
 
   if (!url) {
-    console.error('Usage: bun run rdf-extractor.ts [--all] <URI>');
+    console.error('Usage: bun run wrx.js [--all] <URI>');
     process.exit(1);
   }
 
@@ -1166,4 +1165,8 @@ if (import.meta.main) {
       console.log('❌ No RDF found after trying all strategies.');
     }
   }
+}
+
+if (import.meta.main) {
+  await runWrxCli();
 }

@@ -1,5 +1,7 @@
-# uri_gator
-Typescript module for URI to rdf navigation
+# wrx
+Web resource extraction for RDF metadata discovery.
+
+`wrx.js` is the public entrypoint in this repository. It uses a cascading discovery strategy: content negotiation first, then FAIR signposting through HTTP and HTML links, then linkset resolution, embedded RDF scripts, and finally sitemap/DCAT fallback.
 
 ## Install
 
@@ -22,5 +24,7 @@ if (result) {
 	console.log(result.url);
 }
 ```
+
+When working in this repository directly, import from `./wrx.js`.
 
 This package targets Bun runtime APIs.

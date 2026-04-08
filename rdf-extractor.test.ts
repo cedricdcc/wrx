@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { extractRDF } from './rdf-extractor';
+import { extractRDF } from './wrx.js';
 
 const originalFetch = globalThis.fetch;
 const originalDOMParser = (globalThis as { DOMParser?: unknown }).DOMParser;

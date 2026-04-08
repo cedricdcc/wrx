@@ -1,16 +1,17 @@
 {
   "name": "uri_gator",
   "version": "0.1.0",
-  "description": "Bun TypeScript module to extract RDF metadata from a URI using cascading discovery strategies.",
-  "module": "./rdf-extractor.ts",
-  "types": "./rdf-extractor.ts",
+  "description": "Bun TypeScript module for web resource extraction and RDF metadata discovery using cascading strategies.",
+  "module": "./wrx.js",
+  "types": "./wrx.ts",
   "exports": {
-    ".": "./rdf-extractor.ts"
+    ".": "./wrx.js"
   },
   "type": "module",
   "private": false,
   "files": [
-    "rdf-extractor.ts",
+    "wrx.js",
+    "wrx.ts",
     "bun-globals.d.ts",
     "README.md",
     "DOCUMENTATION.md"

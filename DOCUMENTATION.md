@@ -1,8 +1,8 @@
-# uri_gator — RDF Extractor Documentation
+# wrx.js — Web Resource Extraction Documentation
 
 ## Overview
 
-`rdf-extractor.ts` is a zero-dependency Bun/TypeScript module that retrieves RDF metadata from any URI. It follows a **cascading strategy**: each approach is tried in priority order and the first successful result is immediately returned. The module never requires external npm packages — it uses only Bun's built-in `fetch`, `URL`, and `DOMParser`.
+`wrx.js` is a zero-dependency Bun/TypeScript module for web resource extraction from any URI. It retrieves RDF metadata using a **cascading strategy**: each discovery step is tried in priority order and the first successful result is immediately returned. The module never requires external npm packages — it uses only Bun's built-in `fetch`, `URL`, and `DOMParser`.
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```mermaid
 graph TB
-    subgraph "rdf-extractor.ts — Public API"
+    subgraph "wrx.js — Public API"
         A["extractRDF(uri: string)\nreturns Promise of ExtractedRDF or null"]
     end
 
@@ -298,7 +298,8 @@ flowchart TD
 
 ```
 uri_gator/
-├── rdf-extractor.ts      # Core module — export extractRDF(), ExtractedRDF
+├── wrx.ts                # Core module — export extractRDF(), ExtractedRDF
+├── wrx.js                # Public entrypoint wrapper
 ├── bun-globals.d.ts      # Ambient types for import.meta.main and process
 ├── package.json          # Bun project manifest
 ├── tsconfig.json         # TypeScript config (ESNext + DOM + DOM.Iterable libs)
@@ -313,7 +314,7 @@ uri_gator/
 ### As a library
 
 ```typescript
-import { extractRDF, type ExtractedRDF } from './rdf-extractor.ts';
+import { extractRDF, type ExtractedRDF } from './wrx.js';
 
 const result: ExtractedRDF | null = await extractRDF('https://example.org/dataset');
 
@@ -336,7 +337,7 @@ bun add github:cedricdcc/uri_gator
 ### As a CLI tool — first-match mode
 
 ```sh
-bun run rdf-extractor.ts https://example.org/dataset
+bun run wrx.js https://example.org/dataset
 ```
 
 Example output:
@@ -356,7 +357,7 @@ Content length: 4821 chars
 Pass `--all` to run every extraction strategy and get a full overview of what is available for the resource, instead of stopping at the first success:
 
 ```sh
-bun run rdf-extractor.ts --all https://example.org/dataset
+bun run wrx.js --all https://example.org/dataset
 ```
 
 Example output:
@@ -396,7 +397,7 @@ Example output:
 ### As a library — `extractAllRDF`
 
 ```typescript
-import { extractAllRDF, type RDFOverview } from './rdf-extractor.ts';
+import { extractAllRDF, type RDFOverview } from './wrx.js';
 
 const overview: RDFOverview = await extractAllRDF('https://example.org/dataset');
 
