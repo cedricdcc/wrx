@@ -395,14 +395,17 @@ describe('extractRDF', () => {
       const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
 
       if (url === PRODUCT_URI) {
-        if (accept.includes('application/linkset+json')) {
-          // Return linkset when asked for it (conneg)
+        // Return linkset when the linkset Accept type is first (conneg discovery or header follow)
+        if (accept.startsWith('application/linkset+json')) {
           return new Response(LINKSET_BODY, {
             status: 200,
             headers: { 'content-type': 'application/linkset+json' },
           });
         }
-        if (accept.includes('application/ld+json')) {
+        // Return JSON-LD only when it is the highest-priority requested type
+        // (i.e. this is the describedby fetch from within the linkset strategy,
+        //  not the initial multi-MIME discovery fetch where turtle is q=1.0)
+        if (accept.startsWith('application/ld+json')) {
           return new Response(JSONLD_BODY, {
             status: 200,
             headers: { 'content-type': 'application/ld+json' },
