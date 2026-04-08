@@ -8,13 +8,13 @@ Web resource extraction for RDF metadata discovery.
 Install directly from GitHub in another Bun project:
 
 ```bash
-bun add github:cedricdcc/uri_gator
+bun add github:cedricdcc/wrx
 ```
 
 ## Usage
 
 ```ts
-import { extractRDF, type ExtractedRDF } from "uri_gator";
+import { extractRDF, type ExtractedRDF } from "wrx";
 
 const result: ExtractedRDF | null = await extractRDF("https://example.org/dataset");
 
