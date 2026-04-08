@@ -120,162 +120,188 @@ interface RDFOverview {
 The diagram below captures every decision branch inside `extractRDF()`.
 
 ```mermaid
-flowchart TD
-    START(["`**extractRDF(uri)**`"]) --> CN
+flowchart LR
+  subgraph STRATS["Strategies (in order)"]
+    direction TB
+    S0(["Start: extractRDF(uri)"])
+    S1{"S1 Content negotiation\nRDF MIME returned?"}
+    S2{"S2 HTTP Link describedby/profile\nAny target resolves to RDF?"}
+    S3{"S3 Linkset resolution\nAny linkset target resolves to RDF?"}
+    S4{"S4 HTML describedby\nAny target resolves to RDF?"}
+    S5{"S5 HTML linkset\nAny linkset target resolves to RDF?"}
+    S6{"S6 Embedded RDF script\nRDF script present?"}
+    S7{"S7 Sitemap/DCAT fallback\nRDF found?"}
+    S0 --> S1 -->|no| S2 -->|no| S3 -->|no| S4 -->|no| S5 -->|no| S6 -->|no| S7
+  end
 
-    %% ── Step 1: Content Negotiation ──────────────────────────────────────
-    CN["**Step 1 — Content Negotiation**\nfetch(uri)\nAccept: text/turtle;q=1.0, application/ld+json;q=0.9 …"]
-    CN -->|fetch error| NULL1([return null])
-    CN -->|response ok AND Content-Type is RDF| RET1(["`return ExtractedRDF\nsource: 'content-negotiation'`"])
-    CN -->|not RDF or non-200| PARSE_BODY
+  subgraph OUT["Outcomes"]
+    direction TB
+    R1(["Return source: content-negotiation"])
+    R2(["Return source: signposting-link-header"])
+    R3(["Return source: linkset"])
+    R4(["Return source: signposting-html-link"])
+    R5(["Return source: linkset"])
+    R6(["Return source: embedded-script"])
+    R7(["Return source: sitemap-signposting"])
+    R0(["Return null"])
+  end
 
-    %% ── Parse body & Link header ──────────────────────────────────────────
-    PARSE_BODY["Read response body as text\nParse as HTML (DOMParser)\nParse HTTP Link header"]
+  S1 -->|yes| R1
+  S2 -->|yes| R2
+  S3 -->|yes| R3
+  S4 -->|yes| R4
+  S5 -->|yes| R5
+  S6 -->|yes| R6
+  S7 -->|yes| R7
+  S7 -->|no| R0
 
-    PARSE_BODY --> LH
-
-    %% ── Step 2a: Link header — describedby ────────────────────────────────
-    LH["**Step 2a — HTTP Link: rel=describedby**\nFor each link where rel=describedby\n(and type is RDF or absent)"]
-    LH -->|no matching links| LS_HDR
-    LH -->|fetch target → RDF| RET2(["`return ExtractedRDF\nsource: 'signposting-link-header'`"])
-    LH -->|fetch target → not RDF| LS_HDR
-
-    %% ── Step 2b: Link header — linkset ────────────────────────────────────
-    LS_HDR["**Step 2b — HTTP Link: rel=linkset**\nFor each linkset URL in Link header\ncall tryExtractFromLinkset()"]
-    LS_HDR -->|linkset yields RDF| RET3(["`return ExtractedRDF\nsource: 'linkset'`"])
-    LS_HDR -->|no linkset or no RDF| HTML_DB
-
-    %% ── Step 3a: HTML describedby ─────────────────────────────────────────
-    HTML_DB["**Step 3a — HTML link rel=describedby**\nFor each link[rel=describedby] in HTML\ntype is RDF or absent"]
-    HTML_DB -->|no HTML or no matching link| HTML_LS
-    HTML_DB -->|fetch target → RDF| RET4(["`return ExtractedRDF\nsource: 'signposting-html-link'`"])
-    HTML_DB -->|fetch target → not RDF| HTML_LS
-
-    %% ── Step 3b: HTML linkset ─────────────────────────────────────────────
-    HTML_LS["**Step 3b — HTML link rel=linkset**\nFor each link[rel=linkset] in HTML\ncall tryExtractFromLinkset()"]
-    HTML_LS -->|linkset yields RDF| RET5(["`return ExtractedRDF\nsource: 'linkset'`"])
-    HTML_LS -->|no linkset or no RDF| SCRIPT
-
-    %% ── Step 3c: Embedded script ──────────────────────────────────────────
-    SCRIPT["**Step 3c — Embedded RDF script**\nFor each script[type=RDF MIME] in HTML\ne.g. application/ld+json, text/turtle"]
-    SCRIPT -->|found non-empty script| RET6(["`return ExtractedRDF\nsource: 'embedded-script'`"])
-    SCRIPT -->|none found| SITEMAP
-
-    %% ── Step 4: Sitemap fallback ──────────────────────────────────────────
-    SITEMAP["**Step 4 — robots.txt → sitemap.xml**\ncall tryExtractFromSitemapAndDCAT()"]
-    SITEMAP -->|FAIR signposting found| RET7(["`return ExtractedRDF\nsource: 'sitemap-signposting'`"])
-    SITEMAP -->|nothing found| NULL2([return null])
-
-    %% ── Styling ───────────────────────────────────────────────────────────
-    style RET1 fill:#2d6a4f,color:#fff
-    style RET2 fill:#2d6a4f,color:#fff
-    style RET3 fill:#2d6a4f,color:#fff
-    style RET4 fill:#2d6a4f,color:#fff
-    style RET5 fill:#2d6a4f,color:#fff
-    style RET6 fill:#2d6a4f,color:#fff
-    style RET7 fill:#2d6a4f,color:#fff
-    style NULL1 fill:#9d0208,color:#fff
-    style NULL2 fill:#9d0208,color:#fff
+  style R1 fill:#2d6a4f,color:#fff
+  style R2 fill:#2d6a4f,color:#fff
+  style R3 fill:#2d6a4f,color:#fff
+  style R4 fill:#2d6a4f,color:#fff
+  style R5 fill:#2d6a4f,color:#fff
+  style R6 fill:#2d6a4f,color:#fff
+  style R7 fill:#2d6a4f,color:#fff
+  style R0 fill:#9d0208,color:#fff
 ```
 
 ---
 
-## Linkset Resolution — Detail
+## Strategy Deep Dives
 
-`tryExtractFromLinkset()` is called by Steps 2b and 3b above (linkset discovery via HTTP `Link` header and via HTML `<link rel="linkset">` element). It handles **two** RFC 9264 serialisations and applies FAIR Signposting best practices (anchor matching, type-aware fetch, JSON-LD trust, `cite-as` fallback) to maximise compatibility with InvenioRDM / Zenodo deployments.
+The charts below expand each strategy from the main extraction flow.
+
+### S1 — Content Negotiation
 
 ```mermaid
 flowchart TD
-    LS_START(["tryExtractFromLinkset(linksetUrl, baseUri)"])
-    LS_START --> FETCH_LS["fetch(linksetUrl)\nAccept: application/linkset+json;q=1.0, application/linkset;q=0.9"]
-    FETCH_LS -->|error or non-200| LS_NULL([return null])
-    FETCH_LS -->|200 OK| CHECK_CT{Content-Type?}
+  S1_START(["S1 start: fetchRDF(uri)"]) --> S1_FETCH{"Initial fetch succeeded?"}
+  S1_FETCH -->|no| S1_NULL(["Return null (network/fetch failure)"])
+  S1_FETCH -->|yes| S1_CT{"Response Content-Type is RDF MIME and response is ok?"}
+  S1_CT -->|yes| S1_OK(["Return source: content-negotiation"])
+  S1_CT -->|no| S1_NEXT(["Continue to S2"])
 
-    CHECK_CT -->|application/linkset+json\nor application/json| JSON_PATH
-    CHECK_CT -->|application/linkset| TEXT_PATH
-    CHECK_CT -->|other| LS_NULL2([return null])
-
-    subgraph JSON_PATH ["JSON Linkset (application/linkset+json or application/json with linkset array)"]
-        J1["Parse JSON\nVerify body has linkset array"]
-        J_ANCHOR{Any entry whose\nanchor matches baseUri?}
-        J_SEL["Use matching entries\nor all entries if none match"]
-        J2["For each context entry:\nCheck describedby and profile arrays"]
-        J3{target.href present?\nDeclared type is RDF or absent?}
-        J4["fetchDescribedBy(href, declaredType)\nType-aware: declared MIME first in Accept"]
-        J5["resolveRdfFormat(responseCt, declaredType, body)\nTrust declared type if server returns\napplication/json but body looks like JSON-LD"]
-        J6{Effective format\nis RDF?}
-        J7(["`return ExtractedRDF\nsource: 'linkset'`"])
-        JCA["cite-as fallback:\nfetchRDF(citeAs.href)\nContent-negotiate via DOI URL"]
-        JCA2{RDF MIME\nreturned?}
-        JCA3(["`return ExtractedRDF\nsource: 'linkset'`"])
-        J1 --> J_ANCHOR --> J_SEL --> J2 --> J3
-        J3 -->|yes| J4 --> J5 --> J6
-        J6 -->|yes| J7
-        J6 -->|no| J2
-        J3 -->|no, or all targets exhausted| JCA --> JCA2
-        JCA2 -->|yes| JCA3
-        JCA2 -->|no| LS_NULL3([return null])
-    end
-
-    subgraph TEXT_PATH ["Text Linkset (application/linkset)"]
-        T1["Read body, normalise whitespace"]
-        T2["parseLinkHeader() → links[]"]
-        T_ANCHOR{Link has anchor?\nDoes it match baseUri?}
-        T3{rel=describedby\nor rel=profile?}
-        T4["fetchDescribedBy(url, declaredType)\nType-aware fetch"]
-        T5["resolveRdfFormat(responseCt, declaredType, body)"]
-        T6{Effective format\nis RDF?}
-        T7(["`return ExtractedRDF\nsource: 'linkset'`"])
-        T1 --> T2 --> T_ANCHOR
-        T_ANCHOR -->|no anchor, or anchor matches| T3
-        T_ANCHOR -->|anchor does not match| T2
-        T3 -->|yes| T4 --> T5 --> T6
-        T6 -->|yes| T7
-        T6 -->|no| T3
-        T3 -->|no matching links| LS_NULL4([return null])
-    end
-
-    style J7 fill:#2d6a4f,color:#fff
-    style JCA3 fill:#2d6a4f,color:#fff
-    style T7 fill:#2d6a4f,color:#fff
-    style LS_NULL fill:#9d0208,color:#fff
-    style LS_NULL2 fill:#9d0208,color:#fff
-    style LS_NULL3 fill:#9d0208,color:#fff
-    style LS_NULL4 fill:#9d0208,color:#fff
+  style S1_OK fill:#2d6a4f,color:#fff
+  style S1_NULL fill:#9d0208,color:#fff
 ```
 
----
-
-## Sitemap Fallback — Detail
-
-`tryExtractFromSitemapAndDCAT()` is the last-resort strategy when all other approaches fail.
+### S2 — HTTP Link Header DescribedBy/Profile
 
 ```mermaid
 flowchart TD
-    SM_START(["tryExtractFromSitemapAndDCAT(uri)"])
-    SM_START --> ROBOTS["fetch /robots.txt from base URL"]
-    ROBOTS -->|error or non-200| SM_NULL([return null])
-    ROBOTS -->|ok| PARSE_ROBOTS["Parse Sitemap: directives from robots.txt"]
-    PARSE_ROBOTS --> FOR_SM["For each sitemapUrl …"]
-    FOR_SM --> FETCH_SM["fetch(sitemapUrl)"]
-    FETCH_SM -->|error or non-200| NEXT_SM[next sitemap]
-    NEXT_SM --> FOR_SM
-    FETCH_SM -->|ok| PARSE_XML["DOMParser.parseFromString(text, 'text/xml')"]
-    PARSE_XML -->|parse error| NEXT_SM
-    PARSE_XML -->|ok| FOR_URL["For each url element in sitemap …"]
-    FOR_URL --> CHECK_LOC{"loc matches requested URI?\ntrailing-slash tolerant"}
-    CHECK_LOC -->|no| NEXT_URL[next url entry]
-    NEXT_URL --> FOR_URL
-    CHECK_LOC -->|yes| FOR_XLINK["For each xhtml:link in matching url entry"]
-    FOR_XLINK --> CHECK_REL{rel=describedby?\nhref present?\ntype is RDF or absent?}
-    CHECK_REL -->|no| NEXT_XLINK[next xhtml:link]
-    NEXT_XLINK --> FOR_XLINK
-    CHECK_REL -->|yes| FETCH_META["fetchRDF(href)\nCheck Content-Type → is RDF?"]
-    FETCH_META -->|RDF confirmed| RET(["`return ExtractedRDF\nsource: 'sitemap-signposting'`"])
-    FETCH_META -->|not RDF| NEXT_XLINK
+  S2_START(["S2 start: parse Link header entries"]) --> S2_CAND["Collect candidates:\n- rel=describedby (RDF type or no type)\n- rel=profile (RDF type or no type)"]
+  S2_CAND --> S2_LOOP{"Any candidate URL left?"}
+  S2_LOOP -->|no| S2_NEXT(["Continue to S3"])
+  S2_LOOP -->|yes| S2_FETCH["fetchRDF(candidate URL)"]
+  S2_FETCH --> S2_CT{"Response is RDF MIME and ok?"}
+  S2_CT -->|yes| S2_OK(["Return source: signposting-link-header"])
+  S2_CT -->|no| S2_LOOP
 
-    style RET fill:#2d6a4f,color:#fff
-    style SM_NULL fill:#9d0208,color:#fff
+  style S2_OK fill:#2d6a4f,color:#fff
+```
+
+### S3 — Linkset Resolution (Header/Profile/URI Conneg)
+
+This strategy reuses `tryExtractFromLinkset(linksetUrl, baseUri)`.
+
+```mermaid
+flowchart TD
+  LS_START(["tryExtractFromLinkset(linksetUrl, baseUri)"]) --> FETCH_LS["Fetch linkset URL with linkset Accept header"]
+  FETCH_LS --> FETCH_OK{"Response OK?"}
+  FETCH_OK -->|no| LS_NULL(["return null"])
+  FETCH_OK -->|yes| CHECK_CT{"Content-Type"}
+
+  CHECK_CT -->|application/linkset+json\napplication/json\napplication/ld+json| JSON_STEP1
+  CHECK_CT -->|application/linkset| TEXT_STEP1
+  CHECK_CT -->|other| LS_NULL
+
+  JSON_STEP1["Parse JSON and read linkset entries"] --> JSON_STEP2["Choose matching anchor entries, or all entries"]
+  JSON_STEP2 --> JSON_STEP3["Try describedby and profile targets"]
+  JSON_STEP3 --> JSON_OK{"Any target resolves to RDF?"}
+  JSON_OK -->|yes| LS_OK(["Return source: linkset"])
+  JSON_OK -->|no| JSON_CITEAS["Try cite-as fallback via fetchRDF"]
+  JSON_CITEAS --> JSON_CITEAS_OK{"RDF returned?"}
+  JSON_CITEAS_OK -->|yes| LS_OK
+  JSON_CITEAS_OK -->|no| LS_NULL
+
+  TEXT_STEP1["Parse application/linkset text as Link entries"] --> TEXT_STEP2["Keep entries with matching anchor or no anchor"]
+  TEXT_STEP2 --> TEXT_STEP3["Try rel=describedby and rel=profile targets"]
+  TEXT_STEP3 --> TEXT_OK{"Any target resolves to RDF?"}
+  TEXT_OK -->|yes| LS_OK
+  TEXT_OK -->|no| LS_NULL
+
+  style LS_OK fill:#2d6a4f,color:#fff
+  style LS_NULL fill:#9d0208,color:#fff
+```
+
+### S4 — HTML DescribedBy
+
+```mermaid
+flowchart TD
+  S4_START(["S4 start: inspect HTML hints and parsed DOM"]) --> S4_COLLECT["Collect link rel=describedby hrefs\n(type is RDF or absent)"]
+  S4_COLLECT --> S4_LOOP{"Any describedby URL left?"}
+  S4_LOOP -->|no| S4_NEXT(["Continue to S5"])
+  S4_LOOP -->|yes| S4_FETCH["fetchRDF(meta URL)"]
+  S4_FETCH --> S4_CT{"Response is RDF MIME and ok?"}
+  S4_CT -->|yes| S4_OK(["Return source: signposting-html-link"])
+  S4_CT -->|no| S4_LOOP
+
+  style S4_OK fill:#2d6a4f,color:#fff
+```
+
+### S5 — HTML Linkset
+
+This strategy reuses the same linkset resolver from S3 and only changes discovery source.
+
+```mermaid
+flowchart TD
+  S5_START(["S5 start: collect HTML link rel=linkset hrefs"]) --> S5_LOOP{"Any linkset URL left?"}
+  S5_LOOP -->|no| S5_NEXT(["Continue to S6"])
+  S5_LOOP -->|yes| S5_CALL["Call tryExtractFromLinkset(linksetUrl, uri)"]
+  S5_CALL --> S5_HIT{"Resolver returned RDF?"}
+  S5_HIT -->|yes| S5_OK(["Return source: linkset"])
+  S5_HIT -->|no| S5_LOOP
+
+  style S5_OK fill:#2d6a4f,color:#fff
+```
+
+### S6 — Embedded RDF Script
+
+```mermaid
+flowchart TD
+  S6_START(["S6 start: scan script tags from DOM and HTML fallback parser"]) --> S6_LOOP{"Any script with RDF MIME type?"}
+  S6_LOOP -->|no| S6_NEXT(["Continue to S7"])
+  S6_LOOP -->|yes| S6_CONTENT{"Script content is non-empty?"}
+  S6_CONTENT -->|yes| S6_OK(["Return source: embedded-script"])
+  S6_CONTENT -->|no| S6_NEXT_ITEM(["Check next script"])
+  S6_NEXT_ITEM --> S6_LOOP
+
+  style S6_OK fill:#2d6a4f,color:#fff
+```
+
+### S7 — Sitemap and DCAT Fallback
+
+```mermaid
+flowchart TD
+  SM_START(["S7 start: tryExtractFromSitemapAndDCAT(uri)"]) --> ROBOTS["Fetch robots.txt from base URL"]
+  ROBOTS --> ROBOTS_OK{"robots.txt fetched?"}
+  ROBOTS_OK -->|no| SM_NULL(["Return null"])
+  ROBOTS_OK -->|yes| PARSE_ROBOTS["Extract Sitemap: directives"]
+  PARSE_ROBOTS --> FOR_SM{"Any sitemap URL left?"}
+  FOR_SM -->|no| SM_NULL
+  FOR_SM -->|yes| FETCH_SM["Fetch sitemap XML"]
+  FETCH_SM --> SM_OK{"Sitemap XML parseable?"}
+  SM_OK -->|no| FOR_SM
+  SM_OK -->|yes| CHECK_URL["Find matching loc entry for requested URI"]
+  CHECK_URL --> MATCHED{"Matching entry found?"}
+  MATCHED -->|no| FOR_SM
+  MATCHED -->|yes| CHECK_XLINK["Scan xhtml:link rel=describedby candidates"]
+  CHECK_XLINK --> META_OK{"Any candidate resolves to RDF?"}
+  META_OK -->|yes| SM_RET(["Return source: sitemap-signposting"])
+  META_OK -->|no| FOR_SM
+
+  style SM_RET fill:#2d6a4f,color:#fff
+  style SM_NULL fill:#9d0208,color:#fff
 ```
 
 ---
