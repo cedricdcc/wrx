@@ -6,6 +6,17 @@
 
 ---
 
+## Reference specifications
+
+- [RFC 8288 — Web Linking](https://www.rfc-editor.org/rfc/rfc8288.html)
+- [RFC 6906 — Profile Link Relation](https://www.rfc-editor.org/rfc/rfc6906.html)
+- [RFC 9264 — Linkset](https://www.rfc-editor.org/rfc/rfc9264.html)
+- [RFC 5785 — Well-Known URIs](https://www.rfc-editor.org/rfc/rfc5785.html)
+- [RFC 9727 — API Catalog](https://www.rfc-editor.org/rfc/rfc9727.html)
+- [RFC 7284 — Profile URI Registry](https://www.rfc-editor.org/rfc/rfc7284.html)
+- [RFC 9309 — Robots Exclusion Protocol](https://www.rfc-editor.org/rfc/rfc9309.html)
+- [Sitemap Protocol](http://sitemaps.org/)
+
 ## Module Architecture
 
 ```mermaid
