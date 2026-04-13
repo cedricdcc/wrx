@@ -112,6 +112,7 @@ interface RDFOverview {
 | `application/n-triples` | N-Triples |
 | `text/n3` | Notation3 |
 | `application/n-quads` | N-Quads |
+| `application/trig` | TriG |
 
 ---
 

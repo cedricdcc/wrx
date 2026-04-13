@@ -28,6 +28,7 @@ const RDF_MIMES = new Set([
   'application/n-triples',
   'text/n3',
   'application/n-quads',
+  'application/trig',
 ]);
 
 /** Preferred Accept header for content negotiation */
@@ -37,6 +38,8 @@ const RDF_ACCEPT = [
   'application/rdf+xml;q=0.8',
   'application/n-triples;q=0.7',
   'text/n3;q=0.6',
+  'application/n-quads;q=0.5',
+  'application/trig;q=0.4',
 ].join(', ');
 
 /** Simple but robust Link header parser (handles both HTTP Link and application/linkset) */
@@ -163,7 +166,15 @@ async function fetchRDF(url: string): Promise<Response> {
 async function fetchDescribedBy(url: string, declaredType?: string): Promise<Response> {
   if (!declaredType || !isRDFMime(declaredType)) return fetchRDF(url);
   // Build an Accept header with the declared type at q=1.0, all others below
-  const others = ['text/turtle', 'application/ld+json', 'application/rdf+xml', 'application/n-triples', 'text/n3']
+  const others = [
+    'text/turtle',
+    'application/ld+json',
+    'application/rdf+xml',
+    'application/n-triples',
+    'text/n3',
+    'application/n-quads',
+    'application/trig',
+  ]
     .filter((m) => m !== declaredType)
     .map((m, i) => `${m};q=${Math.max(0.1, 0.9 - i * 0.1).toFixed(1)}`);
   const accept = [`${declaredType};q=1.0`, ...others].join(', ');
@@ -664,6 +675,7 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
     'application/n-triples',
     'text/n3',
     'application/n-quads',
+    'application/trig',
   ];
   let cnFound = false;
   for (const mime of MIME_ORDER) {
