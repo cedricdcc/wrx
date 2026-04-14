@@ -66,6 +66,41 @@ describe('extractRDF', () => {
     expect(result).toBeNull();
   });
 
+  test('requests newer RDF serializations (n-quads, trig) during content negotiation', async () => {
+    const DATASET = 'https://data.example/dataset';
+    const TRIG_BODY = '@prefix : <https://example/> . { :s :p :o . }';
+    let seenAccept = '';
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
+
+      if (url === DATASET) {
+        seenAccept = accept;
+        if (accept.includes('application/trig')) {
+          return new Response(TRIG_BODY, {
+            status: 200,
+            headers: { 'content-type': 'application/trig' },
+          });
+        }
+        return new Response('<html><body>Fallback</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        });
+      }
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(DATASET);
+
+    expect(seenAccept).toContain('application/n-quads');
+    expect(seenAccept).toContain('application/trig');
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('content-negotiation');
+    expect(result?.format).toBe('application/trig');
+    expect(result?.content).toBe(TRIG_BODY);
+  });
+
   // InvenioRDM / Zenodo-style signposting:
   //  - Landing page → Link header with rel=linkset pointing to the API URL
   //  - API URL (Accept: application/linkset+json) → linkset+json with anchor matching
