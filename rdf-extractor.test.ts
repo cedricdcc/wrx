@@ -564,3 +564,162 @@ describe('extractRDF', () => {
     expect(result?.content).toBe(TURTLE_BODY);
   });
 });
+
+// ---- parseNTriples ----
+
+import { parseNTriples, countRdfTriples, buildTriplestore } from './wrx.js';
+
+describe('parseNTriples', () => {
+  test('parses basic N-Triples', () => {
+    const nt = [
+      '<https://example.org/s> <https://example.org/p> <https://example.org/o> .',
+      '<https://example.org/s> <https://example.org/p2> "hello" .',
+    ].join('\n');
+    const triples = parseNTriples(nt);
+    expect(triples).toHaveLength(2);
+    expect(triples[0]).toMatchObject({
+      subject: '<https://example.org/s>',
+      predicate: '<https://example.org/p>',
+      object: '<https://example.org/o>',
+    });
+    expect(triples[1]).toMatchObject({
+      subject: '<https://example.org/s>',
+      predicate: '<https://example.org/p2>',
+      object: '"hello"',
+    });
+  });
+
+  test('skips empty lines and comments', () => {
+    const nt = [
+      '',
+      '# this is a comment',
+      '<https://example.org/s> <https://example.org/p> <https://example.org/o> .',
+      '',
+    ].join('\n');
+    expect(parseNTriples(nt)).toHaveLength(1);
+  });
+
+  test('parses literals with language tags and datatypes', () => {
+    const nt = [
+      '<https://s> <https://p> "bonjour"@fr .',
+      '<https://s> <https://p2> "42"^^<https://www.w3.org/2001/XMLSchema#integer> .',
+    ].join('\n');
+    const triples = parseNTriples(nt);
+    expect(triples).toHaveLength(2);
+    expect(triples[0]!.object).toBe('"bonjour"@fr');
+    expect(triples[1]!.object).toBe('"42"^^<https://www.w3.org/2001/XMLSchema#integer>');
+  });
+
+  test('parses N-Quads and sets graph property', () => {
+    const nq = '<https://s> <https://p> <https://o> <https://graph> .';
+    const triples = parseNTriples(nq);
+    expect(triples).toHaveLength(1);
+    expect(triples[0]!.graph).toBe('<https://graph>');
+  });
+
+  test('parses blank node subjects and objects', () => {
+    const nt = '_:b0 <https://example.org/p> _:b1 .';
+    const triples = parseNTriples(nt);
+    expect(triples).toHaveLength(1);
+    expect(triples[0]!.subject).toBe('_:b0');
+    expect(triples[0]!.object).toBe('_:b1');
+  });
+
+  test('returns empty array for empty input', () => {
+    expect(parseNTriples('')).toHaveLength(0);
+    expect(parseNTriples('   \n   ')).toHaveLength(0);
+  });
+});
+
+// ---- countRdfTriples ----
+
+describe('countRdfTriples', () => {
+  test('counts N-Triples exactly', () => {
+    const nt = [
+      '<https://s> <https://p> <https://o> .',
+      '<https://s> <https://p2> "hello" .',
+      '# comment',
+      '',
+    ].join('\n');
+    expect(countRdfTriples(nt, 'application/n-triples')).toBe(2);
+  });
+
+  test('counts N-Quads exactly', () => {
+    const nq = [
+      '<https://s> <https://p> <https://o> <https://g> .',
+      '<https://s2> <https://p> <https://o> <https://g> .',
+    ].join('\n');
+    expect(countRdfTriples(nq, 'application/n-quads')).toBe(2);
+  });
+
+  test('counts JSON-LD triples approximately', () => {
+    const jsonLd = JSON.stringify({
+      '@context': 'https://schema.org/',
+      '@type': 'Dataset',
+      'name': 'Test',
+      'description': 'A test dataset',
+    });
+    // @type = 1, name = 1, description = 1 → 3 triples
+    expect(countRdfTriples(jsonLd, 'application/ld+json')).toBe(3);
+  });
+
+  test('returns 0 for invalid JSON-LD', () => {
+    expect(countRdfTriples('not json', 'application/ld+json')).toBe(0);
+  });
+
+  test('returns -1 for Turtle (requires external parser)', () => {
+    expect(countRdfTriples('@prefix ex: <https://ex.org/> . ex:s ex:p ex:o .', 'text/turtle')).toBe(-1);
+  });
+
+  test('returns -1 for RDF/XML (requires external parser)', () => {
+    expect(countRdfTriples('<rdf:RDF/>', 'application/rdf+xml')).toBe(-1);
+  });
+});
+
+// ---- buildTriplestore ----
+
+describe('buildTriplestore', () => {
+  test('builds triplestore from N-Triples source', () => {
+    const src = {
+      content: '<https://s> <https://p> <https://o> .',
+      format: 'application/n-triples',
+      source: 'content-negotiation' as const,
+      url: 'https://example.org/',
+    };
+    const ts = buildTriplestore([src]);
+    expect(ts.triples).toHaveLength(1);
+    expect(ts.sources).toHaveLength(1);
+    expect(ts.triples[0]).toMatchObject({
+      subject: '<https://s>',
+      predicate: '<https://p>',
+      object: '<https://o>',
+    });
+  });
+
+  test('deduplicates identical triples from multiple sources', () => {
+    const triple = '<https://s> <https://p> <https://o> .';
+    const src1 = { content: triple, format: 'application/n-triples', source: 'content-negotiation' as const, url: 'https://a/' };
+    const src2 = { content: triple, format: 'application/n-quads', source: 'linkset' as const, url: 'https://b/' };
+    const ts = buildTriplestore([src1, src2]);
+    expect(ts.triples).toHaveLength(1); // deduplicated
+    expect(ts.sources).toHaveLength(2);
+  });
+
+  test('includes non-N-Triples sources in sources list but not in triples', () => {
+    const src = {
+      content: '@prefix ex: <https://ex.org/> . ex:s ex:p ex:o .',
+      format: 'text/turtle',
+      source: 'content-negotiation' as const,
+      url: 'https://example.org/',
+    };
+    const ts = buildTriplestore([src]);
+    expect(ts.triples).toHaveLength(0); // Turtle not parseable without external lib
+    expect(ts.sources).toHaveLength(1);
+  });
+
+  test('returns empty triplestore for empty sources', () => {
+    const ts = buildTriplestore([]);
+    expect(ts.triples).toHaveLength(0);
+    expect(ts.sources).toHaveLength(0);
+  });
+});

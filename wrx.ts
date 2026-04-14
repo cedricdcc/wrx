@@ -20,6 +20,26 @@ export interface ExtractedRDF {
   url: string;
 }
 
+/** A single RDF triple (or quad when graph is present) */
+export interface Triple {
+  subject: string;
+  predicate: string;
+  object: string;
+  /** Named graph — present only for N-Quads / TriG quads */
+  graph?: string;
+}
+
+/**
+ * In-memory triplestore aggregating RDF triples from one or more extraction sources.
+ * Triples are deduplicated by their subject/predicate/object/graph key.
+ */
+export interface Triplestore {
+  /** Deduplicated triples parsed from all sources (N-Triples / N-Quads only for now) */
+  triples: Triple[];
+  /** The RDF sources that were used to build this store */
+  sources: ExtractedRDF[];
+}
+
 /** MIME types we consider valid RDF serializations */
 const RDF_MIMES = new Set([
   'text/turtle',
@@ -80,6 +100,172 @@ function isRDFMime(mime: string): boolean {
 function isLinksetMime(mime: string): boolean {
   const m = mime.toLowerCase().trim();
   return m === 'application/linkset+json' || m === 'application/linkset';
+}
+
+// ---- N-Triples / N-Quads parser ----
+
+/**
+ * Tokenize one N-Triples / N-Quads statement line (trailing dot already stripped or
+ * the loop stops at the dot).  Returns an array of term strings:
+ *   [subject, predicate, object]            for N-Triples
+ *   [subject, predicate, object, graph]     for N-Quads
+ */
+function tokenizeNTriplesLine(line: string): string[] {
+  const tokens: string[] = [];
+  let i = 0;
+  const len = line.length;
+
+  while (i < len) {
+    // Skip whitespace
+    while (i < len && (line[i] === ' ' || line[i] === '\t')) i++;
+    if (i >= len) break;
+    const ch = line[i];
+    if (ch === '.') break; // end of statement marker
+
+    if (ch === '<') {
+      // IRI reference
+      const start = i++;
+      while (i < len && line[i] !== '>') {
+        if (line[i] === '\\') i++; // escaped char — skip both
+        i++;
+      }
+      if (i < len) i++; // consume closing '>'
+      tokens.push(line.slice(start, i));
+    } else if (ch === '_') {
+      // Blank node label: _:identifier
+      const start = i;
+      while (i < len && line[i] !== ' ' && line[i] !== '\t') i++;
+      tokens.push(line.slice(start, i));
+    } else if (ch === '"') {
+      // Literal value
+      const start = i++;
+      while (i < len) {
+        if (line[i] === '\\') { i += 2; continue; }
+        if (line[i] === '"') { i++; break; }
+        i++;
+      }
+      // Optional language tag  "@lang"  or datatype  "^^<iri>"
+      if (i < len && line[i] === '@') {
+        while (i < len && line[i] !== ' ' && line[i] !== '\t') i++;
+      } else if (i + 1 < len && line[i] === '^' && line[i + 1] === '^') {
+        i += 2;
+        if (i < len && line[i] === '<') {
+          while (i < len && line[i] !== '>') i++;
+          if (i < len) i++; // consume '>'
+        }
+      }
+      tokens.push(line.slice(start, i));
+    } else {
+      i++; // skip unrecognised character
+    }
+  }
+  return tokens;
+}
+
+/**
+ * Parse N-Triples (application/n-triples) or N-Quads (application/n-quads) content
+ * into an array of Triple objects.  Empty lines and comment lines are ignored.
+ */
+export function parseNTriples(content: string): Triple[] {
+  const triples: Triple[] = [];
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const terms = tokenizeNTriplesLine(line);
+    if (terms.length < 3) continue;
+    const triple: Triple = {
+      subject: terms[0]!,
+      predicate: terms[1]!,
+      object: terms[2]!,
+    };
+    if (terms.length >= 4 && terms[3] && terms[3] !== '.') {
+      triple.graph = terms[3];
+    }
+    triples.push(triple);
+  }
+  return triples;
+}
+
+// ---- Triple counting helpers ----
+
+/** Roughly count triples inside a JSON-LD value tree (no external parser) */
+function countJsonLdTriples(obj: unknown): number {
+  if (Array.isArray(obj)) {
+    return (obj as unknown[]).reduce((s: number, x: unknown) => s + countJsonLdTriples(x), 0);
+  }
+  if (typeof obj !== 'object' || obj === null) return 0;
+  const rec = obj as Record<string, unknown>;
+  // Unwrap @graph
+  if ('@graph' in rec) return countJsonLdTriples(rec['@graph']);
+  let count = 0;
+  for (const [key, val] of Object.entries(rec)) {
+    if (key === '@context' || key === '@id' || key === '@base' || key === '@vocab') continue;
+    if (key === '@type') {
+      count += Array.isArray(val) ? (val as unknown[]).length : 1;
+      continue;
+    }
+    if (key.startsWith('@')) continue;
+    // Each value in an array = one triple; recurse for nested objects (blank nodes)
+    if (Array.isArray(val)) {
+      count += (val as unknown[]).length;
+      for (const item of val as unknown[]) {
+        if (typeof item === 'object' && item !== null) count += countJsonLdTriples(item);
+      }
+    } else {
+      count += 1;
+      if (typeof val === 'object' && val !== null) count += countJsonLdTriples(val);
+    }
+  }
+  return count;
+}
+
+/**
+ * Count the number of RDF triples (or quads) in the given content string.
+ *
+ * - `application/n-triples` / `application/n-quads`: exact count via line-by-line parsing.
+ * - `application/ld+json`: approximate count by traversing the JSON structure.
+ * - All other formats: returns -1 (count not available without a full external parser).
+ */
+export function countRdfTriples(content: string, format: string): number {
+  const mime = format.toLowerCase().trim();
+  if (mime === 'application/n-triples' || mime === 'application/n-quads') {
+    return parseNTriples(content).length;
+  }
+  if (mime === 'application/ld+json') {
+    try {
+      return countJsonLdTriples(JSON.parse(content) as unknown);
+    } catch {
+      return 0;
+    }
+  }
+  // Turtle, N3, RDF/XML, TriG — full parsing requires an external library
+  return -1;
+}
+
+/**
+ * Build an in-memory Triplestore from one or more ExtractedRDF sources.
+ *
+ * Triples are fully parsed from `application/n-triples` and `application/n-quads`
+ * sources.  Sources in other formats contribute to `sources` but cannot be fully
+ * parsed without an external RDF library — their triples are not added to `triples`.
+ * All triples are deduplicated by their subject/predicate/object/graph key.
+ */
+export function buildTriplestore(sources: ExtractedRDF[]): Triplestore {
+  const seen = new Set<string>();
+  const triples: Triple[] = [];
+  for (const src of sources) {
+    const mime = src.format.toLowerCase().trim();
+    if (mime === 'application/n-triples' || mime === 'application/n-quads') {
+      for (const t of parseNTriples(src.content)) {
+        const key = `${t.subject}\x00${t.predicate}\x00${t.object}\x00${t.graph ?? ''}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          triples.push(t);
+        }
+      }
+    }
+  }
+  return { triples, sources };
 }
 
 /** Extract the base MIME type (before any parameters) from a Content-Type header value */
@@ -437,6 +623,14 @@ export interface ContentNegotiationResult {
   responseMime: string;
   /** Number of characters in the response body */
   chars: number;
+  /**
+   * Number of triples in the response.
+   * Exact for `application/n-triples` / `application/n-quads`;
+   * approximate for `application/ld+json`;
+   * -1 for formats that cannot be counted without an external parser.
+   * 0 when the response is not RDF.
+   */
+  tripleCount: number;
   /** Whether the response Content-Type is a recognised RDF serialization */
   isRdf: boolean;
   /** The final URL after any redirects */
@@ -455,6 +649,8 @@ export interface RDFOverview {
    * callers can see exactly what the server returned for each Accept value.
    */
   contentNegotiations: ContentNegotiationResult[];
+  /** Aggregated triplestore built from all successfully parsed RDF sources */
+  triplestore: Triplestore;
 }
 
 /** Collect ALL RDF hits from a linkset (does not stop on first success) */
@@ -688,6 +884,7 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
         requestedMime: mime,
         responseMime: cnCt || '(unknown)',
         chars: cnBody.length,
+        tripleCount: isRdf ? countRdfTriples(cnBody, cnCt) : 0,
         isRdf,
         url: cnRes.url || uri,
       });
@@ -858,7 +1055,7 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
     notFound.push('sitemap-signposting');
   }
 
-  return { found, notFound, contentNegotiations };
+  return { found, notFound, contentNegotiations, triplestore: buildTriplestore(found) };
 }
 
 /**
@@ -1067,18 +1264,111 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
 
 // Optional CLI for quick testing
 // Usage:
-//   bun run wrx.js <URI>          — return first RDF found
-//   bun run wrx.js --all <URI>    — explore all paths and print overview
+//   bun run wrx.js <URI>           — return first RDF found
+//   bun run wrx.js --all <URI>     — explore all paths and print overview
+//   bun run wrx.js --test <URI>    — compare RDF across strategies and content negotiations
 export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise<void> {
-  const allMode = args.includes('--all');
-  const url = args.find((a: string) => a !== '--all');
+  const allMode  = args.includes('--all');
+  const testMode = args.includes('--test');
+  const url = args.find((a: string) => a !== '--all' && a !== '--test');
 
   if (!url) {
-    console.error('Usage: bun run wrx.js [--all] <URI>');
+    console.error('Usage: bun run wrx.js [--all | --test] <URI>');
     process.exit(1);
   }
 
-  if (allMode) {
+  /** Format a triple-count for display. -1 → "n/a", 0 → "0" */
+  function fmtTriples(n: number): string {
+    if (n === -1) return 'n/a';
+    return n.toLocaleString();
+  }
+
+  if (testMode) {
+    // --test: compare RDF triple counts across all discovered sources
+    console.log(`🧪 Testing RDF consistency for: ${url}\n`);
+    const overview = await extractAllRDF(url);
+
+    // --- Content negotiation comparison ---
+    const cnRdf = overview.contentNegotiations.filter((r) => r.isRdf);
+    if (cnRdf.length === 0) {
+      console.log('  ❌ Content negotiation returned no RDF for any MIME type.\n');
+    } else {
+      console.log('  📡 Content negotiation triple counts per MIME type:');
+      const reqW = Math.max(...overview.contentNegotiations.map((r) => r.requestedMime.length), 'MIME type'.length);
+      for (const cn of overview.contentNegotiations) {
+        if (!cn.isRdf) continue;
+        const tc = fmtTriples(cn.tripleCount);
+        const isApprox = cn.tripleCount >= 0 && cn.responseMime === 'application/ld+json';
+        const approx = isApprox ? ' (approx)' : '';
+        console.log(`       ${cn.requestedMime.padEnd(reqW)}  →  ${tc}${approx} triples  (${cn.responseMime})`);
+      }
+
+      // Check if all RDF-returning formats agree on triple count (where countable)
+      const countable = cnRdf.filter((r) => r.tripleCount >= 0);
+      if (countable.length > 1) {
+        const first = countable[0]!.tripleCount;
+        const allSame = countable.every((r) => r.tripleCount === first);
+        if (allSame) {
+          console.log(`\n  ✅ All ${countable.length} countable format(s) agree: ${first.toLocaleString()} triple(s).`);
+        } else {
+          console.log(`\n  ⚠️  Inconsistency detected across content negotiations:`);
+          for (const r of countable) {
+            console.log(`       ${r.requestedMime}  →  ${r.tripleCount.toLocaleString()} triples`);
+          }
+        }
+      }
+      console.log('');
+    }
+
+    // --- Strategy comparison ---
+    if (overview.found.length === 0) {
+      console.log('  ❌ No RDF found by any strategy.\n');
+    } else {
+      const STRATEGY_LABELS: Record<ExtractedRDF['source'], string> = {
+        'content-negotiation':    'Content Negotiation',
+        'signposting-link-header':'HTTP Link header (signposting)',
+        'linkset':                'Linkset',
+        'signposting-html-link':  'HTML link[rel=describedby]',
+        'embedded-script':        'Embedded RDF script',
+        'sitemap-signposting':    'Sitemap signposting',
+      };
+      console.log('  📊 RDF triple counts per discovered source:');
+      const srcW = Math.max(...overview.found.map((f) => STRATEGY_LABELS[f.source].length), 'Strategy'.length);
+      for (const hit of overview.found) {
+        const tc = countRdfTriples(hit.content, hit.format);
+        const tcStr = fmtTriples(tc);
+        const isApprox = tc >= 0 && hit.format === 'application/ld+json';
+        const approx = isApprox ? ' (approx)' : '';
+        console.log(`       ${STRATEGY_LABELS[hit.source].padEnd(srcW)}  [${hit.format}]  →  ${tcStr}${approx} triples`);
+      }
+
+      // Compare countable sources
+      const countableSrc = overview.found.map((f) => ({ source: f.source, format: f.format, tc: countRdfTriples(f.content, f.format) }))
+        .filter((x) => x.tc >= 0);
+      if (countableSrc.length > 1) {
+        const first = countableSrc[0]!.tc;
+        const allSame = countableSrc.every((x) => x.tc === first);
+        if (allSame) {
+          console.log(`\n  ✅ All ${countableSrc.length} countable source(s) agree: ${first.toLocaleString()} triple(s).`);
+        } else {
+          console.log(`\n  ⚠️  Inconsistency detected across strategies:`);
+          for (const x of countableSrc) {
+            console.log(`       ${STRATEGY_LABELS[x.source]}  [${x.format}]  →  ${x.tc.toLocaleString()} triples`);
+          }
+        }
+      }
+      console.log('');
+    }
+
+    // Triplestore summary
+    const ts = overview.triplestore;
+    if (ts.triples.length > 0) {
+      console.log(`🗄️  Triplestore: ${ts.triples.length.toLocaleString()} unique triple(s) parsed from ${ts.sources.length} source(s).`);
+    } else {
+      console.log('🗄️  Triplestore: 0 triples (no N-Triples/N-Quads source was found, or no RDF was returned).');
+    }
+
+  } else if (allMode) {
     console.log(`🔍 Exploring all RDF paths for: ${url}\n`);
     const overview = await extractAllRDF(url);
 
@@ -1130,19 +1420,22 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
           ? Math.max(...overview.contentNegotiations.map((r) => r.responseMime.length), 'Response MIME'.length)
           : 'Response MIME'.length;
         console.log(
-          `       ${'Requested MIME'.padEnd(reqW)}  →  ${'Response MIME'.padEnd(resW)}  Chars`
+          `       ${'Requested MIME'.padEnd(reqW)}  →  ${'Response MIME'.padEnd(resW)}  Triples`
         );
-        console.log(`       ${'─'.repeat(reqW)}     ${'─'.repeat(resW)}  ─────`);
+        console.log(`       ${'─'.repeat(reqW)}     ${'─'.repeat(resW)}  ───────`);
         for (const cn of overview.contentNegotiations) {
           const flag = cn.isRdf ? '✅' : '❌';
+          const tcStr = cn.isRdf ? fmtTriples(cn.tripleCount).padStart(7) : '      -';
           console.log(
-            `       ${cn.requestedMime.padEnd(reqW)}  →  ${cn.responseMime.padEnd(resW)}  ${cn.chars.toLocaleString().padStart(7)}  ${flag}`
+            `       ${cn.requestedMime.padEnd(reqW)}  →  ${cn.responseMime.padEnd(resW)}  ${tcStr}  ${flag}`
           );
         }
       } else if (hits.length > 0) {
         console.log(`  ✅ Strategy ${stratNum} — ${label}`);
         for (const hit of hits) {
-          console.log(`       ${hit.format}  ${hit.url}  (${hit.content.length} chars)`);
+          const tc = countRdfTriples(hit.content, hit.format);
+          const tcStr = tc === -1 ? 'n/a triples' : `${tc.toLocaleString()} triple(s)`;
+          console.log(`       ${hit.format}  ${hit.url}  (${tcStr})`);
         }
       } else {
         console.log(`  ❌ Strategy ${stratNum} — ${label}`);
@@ -1150,15 +1443,23 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
     }
 
     console.log('');
-    // Summary overview: content negotiation character counts
+    // Summary overview: content negotiation triple counts
     if (overview.contentNegotiations.length > 0) {
       console.log('📋 Content Negotiation Overview (all MIME types):');
       for (const cn of overview.contentNegotiations) {
         const flag = cn.isRdf ? '✅ RDF' : '❌ not RDF';
-        console.log(`   ${cn.requestedMime.padEnd(26)} → ${cn.chars.toLocaleString().padStart(7)} chars  (${cn.responseMime})  ${flag}`);
+        const tcStr = cn.isRdf ? `${fmtTriples(cn.tripleCount).padStart(7)} triples` : '              ';
+        console.log(`   ${cn.requestedMime.padEnd(26)} → ${tcStr}  (${cn.responseMime})  ${flag}`);
       }
       console.log('');
     }
+
+    // Triplestore summary
+    const ts = overview.triplestore;
+    if (ts.triples.length > 0) {
+      console.log(`🗄️  Triplestore: ${ts.triples.length.toLocaleString()} unique triple(s) parsed and deduplicated.`);
+    }
+
     if (overview.found.length > 0) {
       console.log(`📊 ${overview.found.length} unique RDF source(s) found across ${allSources.length} strategies tried.`);
     } else {
@@ -1168,9 +1469,11 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
     console.log(`🔍 Extracting RDF from: ${url}`);
     const result = await extractRDF(url);
     if (result) {
+      const tc = countRdfTriples(result.content, result.format);
+      const tcStr = tc === -1 ? 'n/a (format requires external parser to count)' : `${tc.toLocaleString()} triple(s)`;
       console.log(`✅ Found RDF (${result.source}) from ${result.url}`);
       console.log(`Format: ${result.format}`);
-      console.log(`Content length: ${result.content.length} chars`);
+      console.log(`Triples: ${tcStr}`);
       console.log('\n--- First 500 chars of RDF ---');
       console.log(result.content.slice(0, 500) + (result.content.length > 500 ? '...' : ''));
     } else {

@@ -40,7 +40,8 @@ graph TB
 
     subgraph "Return Type"
         H["ExtractedRDF\n• content: string\n• format: string\n• source: SourceEnum\n• url: string"]
-        H2["RDFOverview\n• found: ExtractedRDF[]\n• notFound: source[]\n• contentNegotiations: ContentNegotiationResult[]"]
+        H2["RDFOverview\n• found: ExtractedRDF[]\n• notFound: source[]\n• contentNegotiations: ContentNegotiationResult[]\n• triplestore: Triplestore"]
+        H3["Triplestore\n• triples: Triple[]\n• sources: ExtractedRDF[]"]
     end
 
     A --> B
@@ -74,7 +75,9 @@ graph TB
 | Type / Constant | Purpose |
 |---|---|
 | `ExtractedRDF` | The result object returned on success |
-| `RDFOverview` | Returned by `extractAllRDF()` — all hits + strategies that found nothing |
+| `Triple` | A single subject-predicate-object (+ optional graph) triple |
+| `Triplestore` | Deduplicated in-memory store of triples aggregated from all sources |
+| `RDFOverview` | Returned by `extractAllRDF()` — all hits + strategies that found nothing + triplestore |
 | `RDF_MIMES` | `Set<string>` of all recognised RDF MIME types |
 | `RDF_ACCEPT` | The `Accept` header value sent during generic content negotiation |
 
@@ -101,7 +104,8 @@ interface ExtractedRDF {
 interface ContentNegotiationResult {
   requestedMime: string;  // MIME type sent in the Accept header
   responseMime:  string;  // Content-Type returned by the server
-  chars:         number;  // Length of the response body
+  chars:         number;  // Length of the response body in characters
+  tripleCount:   number;  // Triple count (exact for N-Triples/N-Quads, approx for JSON-LD, -1 otherwise)
   isRdf:         boolean; // Whether the response is a known RDF serialization
   url:           string;  // Request URL
 }
@@ -110,8 +114,30 @@ interface RDFOverview {
   found:                ExtractedRDF[];                    // All successful RDF hits
   notFound:             Array<ExtractedRDF['source']>;     // Strategies that yielded nothing
   contentNegotiations:  ContentNegotiationResult[];        // Per-MIME-type results for Strategy 1
+  triplestore:          Triplestore;                       // Aggregated triplestore from all sources
 }
 ```
+
+#### `Triple` and `Triplestore` interfaces
+
+```typescript
+interface Triple {
+  subject:   string;   // IRI, blank node label, or literal (raw N-Triples syntax)
+  predicate: string;   // IRI
+  object:    string;   // IRI, blank node label, or literal
+  graph?:    string;   // Named graph IRI (N-Quads / TriG only)
+}
+
+interface Triplestore {
+  triples:  Triple[];        // Deduplicated triples (parsed from N-Triples / N-Quads sources)
+  sources:  ExtractedRDF[];  // All RDF sources used to build the store
+}
+```
+
+> **Note:** Triples are fully parsed from `application/n-triples` and `application/n-quads` sources.
+> Other formats (Turtle, RDF/XML, JSON-LD, …) contribute to `sources` but their triples are not
+> added to `triples` without an external RDF parser.  Use `countRdfTriples()` for an approximate
+> count on JSON-LD sources.
 
 #### Supported RDF MIME types
 
@@ -383,7 +409,7 @@ Example output:
 🔍 Extracting RDF from: https://example.org/dataset
 ✅ Found RDF (content-negotiation) from https://example.org/dataset
 Format: text/turtle
-Content length: 4821 chars
+Triples: n/a (format requires external parser to count)
 
 --- First 500 chars of RDF ---
 @prefix dcat: <http://www.w3.org/ns/dcat#> .
@@ -403,34 +429,64 @@ Example output:
 🔍 Exploring all RDF paths for: https://example.org/dataset
 
   ✅ Strategy 1 — Content Negotiation (3 RDF format(s) found)
-       Requested MIME                →  Response MIME                  Chars
-       ──────────────────────────      ──────────────────────────      ─────
-       text/turtle                   →  text/turtle                       4,821  ✅
-       application/ld+json           →  application/ld+json               2,341  ✅
-       application/rdf+xml           →  text/html                        15,234  ❌
-       application/n-triples         →  application/n-triples             8,901  ✅
-       text/n3                       →  text/turtle                       4,821  ✅ (duplicate format)
-       application/n-quads           →  text/html                        15,234  ❌
+       Requested MIME                →  Response MIME                  Triples
+       ──────────────────────────      ──────────────────────────      ───────
+       text/turtle                   →  text/turtle                        n/a  ✅
+       application/ld+json           →  application/ld+json                 42  ✅
+       application/rdf+xml           →  text/html                            -  ❌
+       application/n-triples         →  application/n-triples               42  ✅
+       text/n3                       →  text/turtle                        n/a  ✅
+       application/n-quads           →  text/html                            -  ❌
   ✅ Strategy 2 — HTTP Link header (rel=describedby)
-       text/turtle  https://example.org/dataset.ttl  (4821 chars)
+       text/turtle  https://example.org/dataset.ttl  (n/a triples)
   ❌ Strategy 3 — Linkset (rel=linkset)
   ❌ Strategy 4 — HTML link[rel=describedby]
   ✅ Strategy 5 — Embedded RDF script
-       application/ld+json  https://example.org/dataset  (312 chars)
+       application/ld+json  https://example.org/dataset  (8 triple(s))
   ❌ Strategy 6 — Sitemap signposting (robots.txt)
 
 📋 Content Negotiation Overview (all MIME types):
-   text/turtle                →   4,821 chars  (text/turtle)             ✅ RDF
-   application/ld+json        →   2,341 chars  (application/ld+json)     ✅ RDF
-   application/rdf+xml        →  15,234 chars  (text/html)               ❌ not RDF
-   application/n-triples      →   8,901 chars  (application/n-triples)   ✅ RDF
-   text/n3                    →   4,821 chars  (text/turtle)             ✅ RDF
-   application/n-quads        →  15,234 chars  (text/html)               ❌ not RDF
+   text/turtle                →         n/a triples  (text/turtle)             ✅ RDF
+   application/ld+json        →          42 triples  (application/ld+json)     ✅ RDF
+   application/rdf+xml        →                      (text/html)               ❌ not RDF
+   application/n-triples      →          42 triples  (application/n-triples)   ✅ RDF
+   text/n3                    →         n/a triples  (text/turtle)             ✅ RDF
+   application/n-quads        →                      (text/html)               ❌ not RDF
 
+🗄️  Triplestore: 42 unique triple(s) parsed and deduplicated.
 📊 3 unique RDF source(s) found across 6 strategies tried.
 ```
 
 > **Note:** `text/n3` returned `text/turtle` in the example above, which is the same format as the first request. The `found` array deduplicates by response format, so both requests count in `contentNegotiations` but only one entry appears in `found`.
+
+### As a CLI tool — `--test` mode (compare RDF consistency)
+
+Pass `--test` to run all strategies, compare the triple counts returned by each content-negotiation MIME type and each discovery strategy, and report whether they agree:
+
+```sh
+bun run wrx.js --test https://example.org/dataset
+```
+
+Example output:
+```
+🧪 Testing RDF consistency for: https://example.org/dataset
+
+  📡 Content negotiation triple counts per MIME type:
+       application/ld+json    →  42 triples  (application/ld+json)
+       application/n-triples  →  42 triples  (application/n-triples)
+
+  ✅ All 2 countable format(s) agree: 42 triple(s).
+
+  📊 RDF triple counts per discovered source:
+       Content Negotiation    [application/n-triples]  →  42 triples
+       HTML link[rel=describedby]  [text/turtle]       →  n/a triples (not countable without external parser)
+
+  ✅ All 1 countable source(s) agree: 42 triple(s).
+
+🗄️  Triplestore: 42 unique triple(s) parsed from 1 source(s).
+```
+
+If the counts differ between formats or strategies, `⚠️  Inconsistency detected` is shown with per-source details to help pinpoint the discrepancy.
 
 ### As a library — `extractAllRDF`
 
@@ -446,8 +502,30 @@ console.log('Not found via:', overview.notFound);
 
 // Content negotiation details (one entry per MIME type tried)
 for (const cn of overview.contentNegotiations) {
-  console.log(`${cn.requestedMime} → ${cn.responseMime} (${cn.chars} chars) ${cn.isRdf ? '✅' : '❌'}`);
+  console.log(`${cn.requestedMime} → ${cn.responseMime} (${cn.tripleCount} triples) ${cn.isRdf ? '✅' : '❌'}`);
 }
+
+// Triplestore built from all N-Triples / N-Quads sources
+const ts = overview.triplestore;
+console.log(`${ts.triples.length} unique triples across ${ts.sources.length} source(s)`);
+```
+
+### As a library — `parseNTriples`, `countRdfTriples`, `buildTriplestore`
+
+```typescript
+import { parseNTriples, countRdfTriples, buildTriplestore, type Triple, type Triplestore } from './wrx.js';
+
+// Parse N-Triples / N-Quads content
+const triples: Triple[] = parseNTriples(`
+  <https://example.org/s> <https://example.org/p> <https://example.org/o> .
+`);
+// triples[0] → { subject: '<https://example.org/s>', predicate: '...', object: '...' }
+
+// Count triples in any RDF content (exact for N-Triples/N-Quads, approx for JSON-LD, -1 otherwise)
+const count = countRdfTriples(rdfString, 'application/n-triples');
+
+// Build a deduplicated triplestore from multiple ExtractedRDF results
+const ts: Triplestore = buildTriplestore(overview.found);
 ```
 
 ---
@@ -455,7 +533,13 @@ for (const cn of overview.contentNegotiations) {
 ## Design Decisions
 
 ### Per-MIME-type content negotiation in `--all` mode
-In the default `extractRDF()` mode, a single HTTP request is made with a combined `Accept` header listing all supported RDF MIME types. In `extractAllRDF()` (`--all` mode), each RDF MIME type is tried individually in its own HTTP request so that every possible server response is captured. Results are deduplicated (two requests returning the same format produce only one entry in `found`). Non-RDF responses are recorded in `contentNegotiations` with their character count, making it easy to see which MIME types the server does — and does not — support for the target resource.
+In the default `extractRDF()` mode, a single HTTP request is made with a combined `Accept` header listing all supported RDF MIME types. In `extractAllRDF()` (`--all` mode), each RDF MIME type is tried individually in its own HTTP request so that every possible server response is captured. Results are deduplicated (two requests returning the same format produce only one entry in `found`). Non-RDF responses are recorded in `contentNegotiations` along with a `tripleCount` field, making it easy to compare what each MIME type returns.
+
+### Triplestore as end outcome
+`extractAllRDF()` (and the `--all` / `--test` CLI modes) produce a `Triplestore` as the final output.  The triplestore aggregates triples from all discovered RDF sources and deduplicates them by a `subject + predicate + object + graph` key.  Currently, triples can only be fully parsed from `application/n-triples` and `application/n-quads` sources; other formats contribute their `ExtractedRDF` to `sources` but require an external library (such as `n3`) for full parsing.  `countRdfTriples()` provides an approximate count for `application/ld+json` without external dependencies.
+
+### `--test` CLI mode
+The `--test` flag runs `extractAllRDF()` and compares the triple counts returned by each content-negotiation MIME type and each discovery strategy.  Where counts differ between comparable sources, a `⚠️  Inconsistency detected` warning is shown so operators can identify servers that return semantically different RDF depending on the requested format.
 
 ### No external dependencies
 The module relies exclusively on Bun built-ins (`fetch`, `URL`, `DOMParser`, `Response`). This keeps deployment simple — no `node_modules`, no `bun install` required at runtime.
