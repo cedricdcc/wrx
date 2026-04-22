@@ -1,5 +1,5 @@
 {
-  "name": "uri_gator",
+  "name": "wrx",
   "version": "0.1.0",
   "description": "Bun TypeScript module for web resource extraction and RDF metadata discovery using cascading strategies.",
   "module": "./wrx.js",
@@ -18,12 +18,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cedricdcc/uri_gator.git"
+    "url": "git+https://github.com/cedricdcc/wrx.git"
   },
   "bugs": {
-    "url": "https://github.com/cedricdcc/uri_gator/issues"
+    "url": "https://github.com/cedricdcc/wrx/issues"
   },
-  "homepage": "https://github.com/cedricdcc/uri_gator#readme",
+  "homepage": "https://github.com/cedricdcc/wrx#readme",
   "keywords": [
     "rdf",
     "linked-data",
