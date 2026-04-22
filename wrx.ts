@@ -20,6 +20,24 @@ export interface ExtractedRDF {
   url: string;
 }
 
+const STRATEGY_LABELS: Record<ExtractedRDF['source'], string> = {
+  'content-negotiation':    'Content Negotiation',
+  'signposting-link-header':'HTTP Link header (rel=describedby)',
+  'linkset':                'Linkset (rel=linkset)',
+  'signposting-html-link':  'HTML link[rel=describedby]',
+  'embedded-script':        'Embedded RDF script',
+  'sitemap-signposting':    'Sitemap signposting (robots.txt)',
+};
+
+const STRATEGY_ORDER: ExtractedRDF['source'][] = [
+  'content-negotiation',
+  'signposting-link-header',
+  'linkset',
+  'signposting-html-link',
+  'embedded-script',
+  'sitemap-signposting',
+];
+
 /** MIME types we consider valid RDF serializations */
 const RDF_MIMES = new Set([
   'text/turtle',
@@ -443,6 +461,24 @@ export interface ContentNegotiationResult {
   url: string;
 }
 
+/** Full strategy-by-strategy execution trace (in the same order as the paper flow) */
+export interface StrategyTraceStep {
+  /** 1-based strategy index in the extraction flow */
+  strategy: number;
+  /** Internal source identifier used by ExtractedRDF */
+  source: ExtractedRDF['source'];
+  /** Human-readable strategy label */
+  label: string;
+  /** Whether this strategy produced at least one RDF hit */
+  found: boolean;
+  /** RDF hits produced by this strategy */
+  hits: Array<{
+    format: string;
+    url: string;
+    chars: number;
+  }>;
+}
+
 /** Overview of all RDF sources discovered across every extraction strategy */
 export interface RDFOverview {
   /** All RDF sources that were successfully extracted */
@@ -455,6 +491,8 @@ export interface RDFOverview {
    * callers can see exactly what the server returned for each Accept value.
    */
   contentNegotiations: ContentNegotiationResult[];
+  /** Full strategy trace from start to finish (ordered, with per-strategy outcomes) */
+  trace: StrategyTraceStep[];
 }
 
 /** Collect ALL RDF hits from a linkset (does not stop on first success) */
@@ -858,7 +896,22 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
     notFound.push('sitemap-signposting');
   }
 
-  return { found, notFound, contentNegotiations };
+  const trace: StrategyTraceStep[] = STRATEGY_ORDER.map((source, i) => {
+    const hits = found.filter((item) => item.source === source);
+    return {
+      strategy: i + 1,
+      source,
+      label: STRATEGY_LABELS[source],
+      found: hits.length > 0,
+      hits: hits.map((hit) => ({
+        format: hit.format,
+        url: hit.url,
+        chars: hit.content.length,
+      })),
+    };
+  });
+
+  return { found, notFound, contentNegotiations, trace };
 }
 
 /**
@@ -1082,24 +1135,6 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
     console.log(`🔍 Exploring all RDF paths for: ${url}\n`);
     const overview = await extractAllRDF(url);
 
-    const STRATEGY_LABELS: Record<ExtractedRDF['source'], string> = {
-      'content-negotiation':    'Content Negotiation',
-      'signposting-link-header':'HTTP Link header (rel=describedby)',
-      'linkset':                'Linkset (rel=linkset)',
-      'signposting-html-link':  'HTML link[rel=describedby]',
-      'embedded-script':        'Embedded RDF script',
-      'sitemap-signposting':    'Sitemap signposting (robots.txt)',
-    };
-
-    const allSources: ExtractedRDF['source'][] = [
-      'content-negotiation',
-      'signposting-link-header',
-      'linkset',
-      'signposting-html-link',
-      'embedded-script',
-      'sitemap-signposting',
-    ];
-
     // Group found entries by source for display
     const bySource = new Map<string, ExtractedRDF[]>();
     for (const entry of overview.found) {
@@ -1109,7 +1144,7 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
     }
 
     let stratNum = 0;
-    for (const source of allSources) {
+    for (const source of STRATEGY_ORDER) {
       stratNum++;
       const label = STRATEGY_LABELS[source];
       const hits = bySource.get(source) ?? [];
@@ -1160,7 +1195,7 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
       console.log('');
     }
     if (overview.found.length > 0) {
-      console.log(`📊 ${overview.found.length} unique RDF source(s) found across ${allSources.length} strategies tried.`);
+      console.log(`📊 ${overview.found.length} unique RDF source(s) found across ${STRATEGY_ORDER.length} strategies tried.`);
     } else {
       console.log('📊 No RDF found after exploring all strategies.');
     }

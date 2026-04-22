@@ -106,10 +106,23 @@ interface ContentNegotiationResult {
   url:           string;  // Request URL
 }
 
+interface StrategyTraceStep {
+  strategy: number; // 1-based strategy index in the paper flow
+  source:   ExtractedRDF['source'];
+  label:    string; // Human-readable strategy label
+  found:    boolean;
+  hits: Array<{
+    format: string;
+    url:    string;
+    chars:  number;
+  }>;
+}
+
 interface RDFOverview {
   found:                ExtractedRDF[];                    // All successful RDF hits
   notFound:             Array<ExtractedRDF['source']>;     // Strategies that yielded nothing
   contentNegotiations:  ContentNegotiationResult[];        // Per-MIME-type results for Strategy 1
+  trace:                StrategyTraceStep[];               // Full ordered strategy trace
 }
 ```
 
