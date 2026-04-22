@@ -14,6 +14,22 @@ afterEach(() => {
 });
 
 describe('extractRDF', () => {
+  test('package metadata matches wrx repository identity', async () => {
+    const packageJsonPath = new URL('./package.json', import.meta.url);
+    const packageJsonRaw = await Bun.file(packageJsonPath).text();
+    const pkg = JSON.parse(packageJsonRaw) as {
+      name?: string;
+      repository?: { url?: string };
+      bugs?: { url?: string };
+      homepage?: string;
+    };
+
+    expect(pkg.name).toBe('wrx');
+    expect(pkg.repository?.url).toBe('git+https://github.com/cedricdcc/wrx.git');
+    expect(pkg.bugs?.url).toBe('https://github.com/cedricdcc/wrx/issues');
+    expect(pkg.homepage).toBe('https://github.com/cedricdcc/wrx#readme');
+  });
+
   test('extracts RDF from HTML describedby when DOMParser is unavailable', async () => {
     delete (globalThis as { DOMParser?: unknown }).DOMParser;
 

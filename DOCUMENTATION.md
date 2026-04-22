@@ -335,7 +335,7 @@ flowchart TD
 ## File Structure
 
 ```
-uri_gator/
+wrx/
 ├── wrx.ts                # Core module — export extractRDF(), ExtractedRDF
 ├── wrx.js                # Public entrypoint wrapper
 ├── bun-globals.d.ts      # Ambient types for import.meta.main and process
@@ -369,7 +369,7 @@ if (result) {
 Install in another Bun project with:
 
 ```sh
-bun add github:cedricdcc/uri_gator
+bun add github:cedricdcc/wrx
 ```
 
 ### As a CLI tool — first-match mode
