@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { extractRDF } from './wrx.js';
+import { extractAllRDF, extractRDF } from './wrx.js';
 
 const originalFetch = globalThis.fetch;
 const originalDOMParser = (globalThis as { DOMParser?: unknown }).DOMParser;
@@ -578,5 +578,69 @@ describe('extractRDF', () => {
     expect(result?.source).toBe('signposting-link-header');
     expect(result?.format).toBe('text/turtle');
     expect(result?.content).toBe(TURTLE_BODY);
+  });
+});
+
+describe('extractAllRDF', () => {
+  test('returns the full ordered strategy trace', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const DATASET = 'https://trace.example/dataset';
+    const TRIG_BODY = '@prefix : <https://trace.example/> . { :s :p :o . }';
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
+
+      if (url === DATASET) {
+        if (accept === 'application/trig') {
+          return new Response(TRIG_BODY, {
+            status: 200,
+            headers: { 'content-type': 'application/trig' },
+          });
+        }
+        return new Response('<html><body>No signposting</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        });
+      }
+
+      if (url === 'https://trace.example/robots.txt') {
+        return new Response('User-agent: *\nDisallow: /', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        });
+      }
+
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const overview = await extractAllRDF(DATASET);
+
+    expect(overview.trace).toHaveLength(6);
+    expect(overview.trace.map((s) => s.source)).toEqual([
+      'content-negotiation',
+      'signposting-link-header',
+      'linkset',
+      'signposting-html-link',
+      'embedded-script',
+      'sitemap-signposting',
+    ]);
+
+    const contentNegotiationStep = overview.trace[0];
+    expect(contentNegotiationStep.strategy).toBe(1);
+    expect(contentNegotiationStep.found).toBe(true);
+    expect(contentNegotiationStep.hits).toEqual([
+      {
+        format: 'application/trig',
+        url: DATASET,
+        chars: TRIG_BODY.length,
+      },
+    ]);
+
+    const sitemapStep = overview.trace[5];
+    expect(sitemapStep.strategy).toBe(6);
+    expect(sitemapStep.found).toBe(false);
+    expect(sitemapStep.hits).toEqual([]);
   });
 });
