@@ -168,11 +168,36 @@ function extractHtmlHints(bodyText: string): {
   return { describedByLinks, linksets, embeddedScripts };
 }
 
+/** Proxy URL for CORS fallback */
+const CORS_PROXY = 'https://corsproxy.io/?';
+
+/**
+ * Fetch with automatic proxy fallback.
+ * First attempts the original URL. If that fails (network error, CORS, etc.),
+ * retries through a CORS proxy and logs the fallback to console.
+ */
+async function fetchWithProxyFallback(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, redirect: 'follow' });
+  } catch (error) {
+    // Try again through CORS proxy
+    const proxyUrl = CORS_PROXY + encodeURIComponent(url);
+    console.log(
+      `⚠️  [wrx] Original fetch failed for ${url}. Retrying through CORS proxy...`
+    );
+    try {
+      return await fetch(proxyUrl, { ...init, redirect: 'follow' });
+    } catch (proxyError) {
+      // If proxy also fails, throw the original error
+      throw error;
+    }
+  }
+}
+
 /** Fetch a URL with RDF content negotiation */
 async function fetchRDF(url: string): Promise<Response> {
-  return fetch(url, {
+  return fetchWithProxyFallback(url, {
     headers: { Accept: RDF_ACCEPT },
-    redirect: 'follow',
   });
 }
 
@@ -196,7 +221,7 @@ async function fetchDescribedBy(url: string, declaredType?: string): Promise<Res
     .filter((m) => m !== declaredType)
     .map((m, i) => `${m};q=${Math.max(0.1, 0.9 - i * 0.1).toFixed(1)}`);
   const accept = [`${declaredType};q=1.0`, ...others].join(', ');
-  return fetch(url, { headers: { Accept: accept }, redirect: 'follow' });
+  return fetchWithProxyFallback(url, { headers: { Accept: accept } });
 }
 
 /**
@@ -267,7 +292,7 @@ async function tryExtractFromLinkset(
   const acceptLinkset = 'application/linkset+json;q=1.0, application/ld+json;q=0.9, application/linkset;q=0.8';
   let res: Response;
   try {
-    res = await fetch(linksetUrl, { headers: { Accept: acceptLinkset }, redirect: 'follow' });
+    res = await fetchWithProxyFallback(linksetUrl, { headers: { Accept: acceptLinkset } });
     if (!res.ok) return null;
   } catch {
     return null;
@@ -379,7 +404,7 @@ async function tryExtractFromSitemapAndDCAT(uri: string): Promise<ExtractedRDF |
   const robotsUrl = `${urlObj.protocol}//${urlObj.host}/robots.txt`;
   let robotsText: string;
   try {
-    const res = await fetch(robotsUrl);
+    const res = await fetchWithProxyFallback(robotsUrl);
     if (!res.ok) return null;
     robotsText = await res.text();
   } catch {
@@ -398,7 +423,7 @@ async function tryExtractFromSitemapAndDCAT(uri: string): Promise<ExtractedRDF |
   for (const sitemapUrl of sitemaps) {
     let sText: string;
     try {
-      const res = await fetch(sitemapUrl);
+      const res = await fetchWithProxyFallback(sitemapUrl);
       if (!res.ok) continue;
       sText = await res.text();
     } catch {
@@ -504,7 +529,7 @@ async function tryExtractAllFromLinkset(
   const acceptLinkset = 'application/linkset+json;q=1.0, application/ld+json;q=0.9, application/linkset;q=0.8';
   let res: Response;
   try {
-    res = await fetch(linksetUrl, { headers: { Accept: acceptLinkset }, redirect: 'follow' });
+    res = await fetchWithProxyFallback(linksetUrl, { headers: { Accept: acceptLinkset } });
     if (!res.ok) return results;
   } catch {
     return results;
@@ -609,7 +634,7 @@ async function tryExtractAllFromSitemapAndDCAT(uri: string): Promise<ExtractedRD
   const robotsUrl = `${urlObj.protocol}//${urlObj.host}/robots.txt`;
   let robotsText: string;
   try {
-    const res = await fetch(robotsUrl);
+    const res = await fetchWithProxyFallback(robotsUrl);
     if (!res.ok) return results;
     robotsText = await res.text();
   } catch {
@@ -628,7 +653,7 @@ async function tryExtractAllFromSitemapAndDCAT(uri: string): Promise<ExtractedRD
   for (const sitemapUrl of sitemaps) {
     let sText: string;
     try {
-      const res = await fetch(sitemapUrl);
+      const res = await fetchWithProxyFallback(sitemapUrl);
       if (!res.ok) continue;
       sText = await res.text();
     } catch {
@@ -718,7 +743,7 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
   let cnFound = false;
   for (const mime of MIME_ORDER) {
     try {
-      const cnRes = await fetch(uri, { headers: { Accept: mime }, redirect: 'follow' });
+      const cnRes = await fetchWithProxyFallback(uri, { headers: { Accept: mime } });
       const cnCt = baseMime(cnRes.headers.get('content-type'));
       const cnBody = await cnRes.text();
       const isRdf = cnRes.ok && isRDFMime(cnCt);
@@ -924,17 +949,23 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
   try {
     res = await fetchRDF(uri);
   } catch {
+    console.error(`Error fetching URI ${uri}`);
     return null;
   }
 
-  let ct = baseMime(res.headers.get('content-type'));
-  if (isRDFMime(ct) && res.ok) {
-    return {
-      content: await res.text(),
-      format: ct,
-      source: 'content-negotiation',
-      url: uri,
-    };
+  try {
+    let ct = baseMime(res.headers.get('content-type'));
+    if (isRDFMime(ct) && res.ok) {
+      return {
+        content: await res.text(),
+        format: ct,
+        source: 'content-negotiation',
+        url: uri,
+      };
+    }
+  } catch {
+    // If the body can't be read, we won't be able to extract RDF from it, but we can still continue with the rest of the strategies that rely on headers.
+    console.error(`Error reading body for URI ${uri}`);
   }
 
   // We will use the body for HTML parsing (signposting / embedded scripts)
