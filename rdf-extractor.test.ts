@@ -303,6 +303,50 @@ describe('extractRDF', () => {
     expect(result?.content).toBe(TURTLE_BODY);
   });
 
+  test('skips a failing header follow-up fetch and continues to later strategies', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const LANDING = 'https://data.example/failover/1';
+    const METADATA = `${LANDING}.ttl`;
+    const JSONLD_BODY = JSON.stringify({
+      '@context': 'https://schema.org/',
+      '@type': 'Dataset',
+      name: 'Fallback Dataset',
+    });
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === LANDING) {
+        return new Response(
+          '<html><head></head><body><script type="application/ld+json">' +
+            JSONLD_BODY +
+            '</script></body></html>',
+          {
+            status: 200,
+            headers: {
+              'content-type': 'text/html; charset=utf-8',
+              link: `<${METADATA}>; rel="describedby"; type="text/turtle"`,
+            },
+          }
+        );
+      }
+
+      if (url === METADATA) {
+        throw new TypeError('Failed to fetch');
+      }
+
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(LANDING);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('embedded-script');
+    expect(result?.format).toBe('application/ld+json');
+    expect(result?.content).toBe(JSONLD_BODY);
+  });
+
   // RFC 9264 §4: Linkset discovery via URI content negotiation.
   // No Link header — the URI itself serves the linkset when asked with the right Accept.
   test('discovers linkset via URI content negotiation (no Link header required)', async () => {

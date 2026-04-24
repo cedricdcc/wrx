@@ -970,15 +970,19 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
   );
   for (const link of describedByFromHeader) {
     const metaUrl = new URL(link['url'], uri).toString();
-    const metaRes = await fetchRDF(metaUrl);
-    const metaCt = baseMime(metaRes.headers.get('content-type'));
-    if (isRDFMime(metaCt) && metaRes.ok) {
-      return {
-        content: await metaRes.text(),
-        format: metaCt,
-        source: 'signposting-link-header',
-        url: metaUrl,
-      };
+    try {
+      const metaRes = await fetchRDF(metaUrl);
+      const metaCt = baseMime(metaRes.headers.get('content-type'));
+      if (isRDFMime(metaCt) && metaRes.ok) {
+        return {
+          content: await metaRes.text(),
+          format: metaCt,
+          source: 'signposting-link-header',
+          url: metaUrl,
+        };
+      }
+    } catch {
+      // Skip this describedby target and continue to the next strategy.
     }
   }
 
@@ -1020,7 +1024,9 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
           url: profileUrl,
         };
       }
-    } catch { /* skip */ }
+    } catch {
+      // Skip this profile target and continue.
+    }
   }
 
   // Also try the URI itself as a linkset endpoint via content negotiation (RFC 9264 §4).
