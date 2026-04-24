@@ -347,6 +347,48 @@ describe('extractRDF', () => {
     expect(result?.content).toBe(JSONLD_BODY);
   });
 
+  test('falls back to embedded scripts when HTML describedby link returns 405', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const LANDING = 'https://data.example/resource/405-fallback';
+    const METADATA_URL = 'https://data.example/resource/405-fallback/metadata.ttl';
+    const JSONLD_BODY = JSON.stringify({
+      '@context': 'https://schema.org/',
+      '@type': 'Dataset',
+      name: 'Resource with 405 Fallback',
+    });
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === LANDING) {
+        return new Response(
+          '<html><head><link rel="describedby" href="./metadata.ttl" type="text/turtle"></head><body>' +
+            '<script type="application/ld+json">' +
+            JSONLD_BODY +
+            '</script></body></html>',
+          {
+            status: 200,
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          }
+        );
+      }
+
+      if (url === METADATA_URL) {
+        return new Response('Method Not Allowed', { status: 405 });
+      }
+
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(LANDING);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('embedded-script');
+    expect(result?.format).toBe('application/ld+json');
+    expect(result?.content).toBe(JSONLD_BODY);
+  });
+
   // RFC 9264 §4: Linkset discovery via URI content negotiation.
   // No Link header — the URI itself serves the linkset when asked with the right Accept.
   test('discovers linkset via URI content negotiation (no Link header required)', async () => {

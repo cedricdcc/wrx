@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>wrx Browser Test Harness</title>
+  <style>
+    :root {
+      --bg: #f6f8ef;
+      --panel: #fffef7;
+      --ink: #1e2a25;
+      --muted: #5a6b62;
+      --accent: #0b7a59;
+      --accent-2: #f2b705;
+      --danger: #b8323a;
+      --border: #cad6c9;
+      --shadow: 0 10px 24px rgba(18, 42, 32, 0.08);
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 20%, rgba(11, 122, 89, 0.12), transparent 32%),
+        radial-gradient(circle at 78% 6%, rgba(242, 183, 5, 0.14), transparent 28%),
+        linear-gradient(175deg, #f7faf2 0%, #f2f7eb 45%, #eef6ef 100%);
+      padding: 28px;
+    }
+
+    .shell {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+      animation: rise 450ms ease-out;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #122f25 0%, #1d4d3c 58%, #245645 100%);
+      color: #f8fffc;
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.4rem, 2.8vw, 2rem);
+      letter-spacing: 0.02em;
+    }
+
+    .hero p {
+      margin: 0;
+      opacity: 0.92;
+      line-height: 1.5;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    label {
+      display: block;
+      font-weight: 650;
+      margin-bottom: 7px;
+      font-size: 0.95rem;
+    }
+
+    input,
+    textarea,
+    select,
+    button {
+      font: inherit;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: #fcfef9;
+      color: var(--ink);
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 120ms ease, box-shadow 120ms ease;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(11, 122, 89, 0.16);
+    }
+
+    textarea {
+      min-height: 170px;
+      resize: vertical;
+      font-family: "IBM Plex Mono", "Consolas", monospace;
+      font-size: 0.87rem;
+      line-height: 1.45;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: saturate(1.1);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #f5fff8;
+    }
+
+    button.secondary {
+      background: #edf4e9;
+      border-color: #c0d0c2;
+      color: #17392d;
+    }
+
+    button.warn {
+      background: #fff4da;
+      border-color: #efcf8c;
+      color: #775300;
+    }
+
+    .status {
+      font-size: 0.9rem;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #f5faf2;
+      color: var(--muted);
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+    }
+
+    .status.ok {
+      color: #14593f;
+      background: #ebf9f2;
+      border-color: #acd9c2;
+    }
+
+    .status.err {
+      color: #7e1f24;
+      background: #fdeff1;
+      border-color: #efb8be;
+    }
+
+    .meta {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    @media (max-width: 860px) {
+      body {
+        padding: 16px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        padding: 18px;
+      }
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <h1>wrx Browser Test Harness</h1>
+      <p>Load your local module, run extractRDF and extractAllRDF against a target URL, and validate 405 fallback behavior in a browser context.</p>
+    </section>
+
+    <section class="panel row">
+      <div>
+        <label for="modulePath">Module path</label>
+        <input id="modulePath" value="./dist/wrx.browser.js" placeholder="./dist/wrx.browser.js">
+      </div>
+      <div>
+        <label for="proxyBase">Proxy prefix (optional)</label>
+        <input id="proxyBase" placeholder="https://corsproxy.io/?">
+      </div>
+      <div>
+        <label for="targetUrl">Target URL</label>
+        <input id="targetUrl" value="https://example.org/dataset" placeholder="https://example.org/dataset">
+      </div>
+      <div class="actions">
+        <button id="loadModuleBtn" class="primary">Load Module</button>
+        <button id="extractBtn" class="secondary">Run extractRDF</button>
+        <button id="extractAllBtn" class="secondary">Run extractAllRDF</button>
+        <button id="simulate405Btn" class="warn">Run 405 Fallback Simulation</button>
+      </div>
+      <div id="status" class="status">Module not loaded.</div>
+      <p class="meta">
+        This harness runs fetch calls in-browser. If a target URL is cross-origin or returns 405 in browser fetch, provide a proxy prefix to retry through a CORS-enabled proxy.
+      </p>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <label for="resultBox">extractRDF result</label>
+        <textarea id="resultBox" readonly></textarea>
+      </article>
+      <article class="panel">
+        <label for="overviewBox">extractAllRDF result</label>
+        <textarea id="overviewBox" readonly></textarea>
+      </article>
+    </section>
+  </main>
+
+  <script type="module">
+    const modulePathInput = document.getElementById("modulePath");
+    const proxyBaseInput = document.getElementById("proxyBase");
+    const targetUrlInput = document.getElementById("targetUrl");
+    const loadModuleBtn = document.getElementById("loadModuleBtn");
+    const extractBtn = document.getElementById("extractBtn");
+    const extractAllBtn = document.getElementById("extractAllBtn");
+    const simulate405Btn = document.getElementById("simulate405Btn");
+    const statusEl = document.getElementById("status");
+    const resultBox = document.getElementById("resultBox");
+    const overviewBox = document.getElementById("overviewBox");
+
+    let loadedModule = null;
+
+    function printJson(value) {
+      return JSON.stringify(value, null, 2);
+    }
+
+    function setStatus(message, kind = "") {
+      statusEl.textContent = message;
+      statusEl.className = `status ${kind}`.trim();
+    }
+
+    function assertModuleLoaded() {
+      if (!loadedModule) {
+        throw new Error("Module not loaded. Click 'Load Module' first.");
+      }
+      if (typeof loadedModule.extractRDF !== "function") {
+        throw new Error("Loaded module does not export extractRDF.");
+      }
+      if (typeof loadedModule.extractAllRDF !== "function") {
+        throw new Error("Loaded module does not export extractAllRDF.");
+      }
+    }
+
+    function normalizeError(error) {
+      if (error instanceof TypeError) {
+        return `Network error: ${error.message}. This is often a CORS block in browser context.`;
+      }
+      return String(error);
+    }
+
+    async function loadModule() {
+      const path = modulePathInput.value.trim();
+      if (!path) {
+        throw new Error("Module path is required.");
+      }
+      if (!/^\.?\//.test(path)) {
+        throw new Error("Module path must be a relative local path (for example ./dist/wrx.browser.js).");
+      }
+
+      // Query suffix avoids stale module cache when editing locally.
+      const bust = `?t=${Date.now()}`;
+      loadedModule = await import(`${path}${path.includes("?") ? "&" : "?"}${bust.slice(1)}`);
+      assertModuleLoaded();
+      setStatus(`Loaded module from ${path}`, "ok");
+    }
+
+    function makeProxyingFetch(originalFetch) {
+      const proxyBase = proxyBaseInput.value.trim();
+      if (!proxyBase) {
+        return originalFetch;
+      }
+
+      return async (input, init) => {
+        const requestUrl = input instanceof Request ? input.url : String(input);
+        const isHttpUrl = /^https?:\/\//i.test(requestUrl);
+
+        try {
+          const directResponse = await originalFetch(input, init);
+          if (isHttpUrl && directResponse.status === 405) {
+            const proxyUrl = `${proxyBase}${encodeURIComponent(requestUrl)}`;
+            return originalFetch(proxyUrl, init);
+          }
+          return directResponse;
+        } catch (error) {
+          if (!isHttpUrl) {
+            throw error;
+          }
+
+          const proxyUrl = `${proxyBase}${encodeURIComponent(requestUrl)}`;
+          return originalFetch(proxyUrl, init);
+        }
+      };
+    }
+
+    async function runExtract() {
+      assertModuleLoaded();
+      const target = targetUrlInput.value.trim();
+      if (!target) {
+        throw new Error("Target URL is required.");
+      }
+      setStatus("Running extractRDF...", "");
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = makeProxyingFetch(originalFetch);
+      try {
+        const result = await loadedModule.extractRDF(target);
+        resultBox.value = printJson(result);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+      setStatus("extractRDF completed", "ok");
+    }
+
+    async function runExtractAll() {
+      assertModuleLoaded();
+      const target = targetUrlInput.value.trim();
+      if (!target) {
+        throw new Error("Target URL is required.");
+      }
+      setStatus("Running extractAllRDF...", "");
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = makeProxyingFetch(originalFetch);
+      try {
+        const overview = await loadedModule.extractAllRDF(target);
+        overviewBox.value = printJson(overview);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+      setStatus("extractAllRDF completed", "ok");
+    }
+
+    async function withFetchMock(mockImpl, run) {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = mockImpl;
+      try {
+        return await run();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    }
+
+    async function run405Simulation() {
+      assertModuleLoaded();
+      setStatus("Running 405 fallback simulation...", "");
+
+      const landing = "https://sim.example/resource";
+      const metadata = `${landing}.ttl`;
+      const jsonldBody = JSON.stringify({
+        "@context": "https://schema.org/",
+        "@type": "Dataset",
+        name: "Simulated fallback dataset"
+      });
+
+      const result = await withFetchMock(async (input) => {
+        const url = String(input);
+        if (url === landing) {
+          return new Response(
+            `<html><body><script type="application/ld+json">${jsonldBody}<\/script></body></html>`,
+            {
+              status: 200,
+              headers: {
+                "content-type": "text/html",
+                "link": `<${metadata}>; rel="describedby"; type="text/turtle"`
+              }
+            }
+          );
+        }
+        if (url === metadata) {
+          return new Response("Method Not Allowed", { status: 405, statusText: "Method Not Allowed" });
+        }
+        return new Response("Not found", { status: 404 });
+      }, async () => loadedModule.extractRDF(landing));
+
+      resultBox.value = printJson(result);
+      if (result && result.source === "embedded-script") {
+        setStatus("Simulation passed: extractor skipped 405 target and continued.", "ok");
+      } else {
+        setStatus("Simulation completed, but fallback did not resolve as expected.", "err");
+      }
+    }
+
+    loadModuleBtn.addEventListener("click", async () => {
+      try {
+        await loadModule();
+      } catch (error) {
+        setStatus(normalizeError(error), "err");
+      }
+    });
+
+    extractBtn.addEventListener("click", async () => {
+      try {
+        await runExtract();
+      } catch (error) {
+        setStatus(normalizeError(error), "err");
+      }
+    });
+
+    extractAllBtn.addEventListener("click", async () => {
+      try {
+        await runExtractAll();
+      } catch (error) {
+        setStatus(normalizeError(error), "err");
+      }
+    });
+
+    simulate405Btn.addEventListener("click", async () => {
+      try {
+        await run405Simulation();
+      } catch (error) {
+        setStatus(normalizeError(error), "err");
+      }
+    });
+  </script>
+</body>
+</html>

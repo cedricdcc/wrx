@@ -1083,6 +1083,19 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
       try {
         metaRes = await fetchRDF(metaUrl);
       } catch {
+        // Fallback: if describedby fetch fails (e.g., 405, network error),
+        // try to extract embedded RDF scripts from the HTML we already have
+        for (const script of htmlScripts) {
+          const scriptType = script.type.toLowerCase();
+          if (isRDFMime(scriptType)) {
+            return {
+              content: script.content,
+              format: scriptType,
+              source: 'embedded-script',
+              url: uri,
+            };
+          }
+        }
         continue;
       }
       const metaCt = baseMime(metaRes.headers.get('content-type'));
