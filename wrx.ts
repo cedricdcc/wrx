@@ -49,9 +49,9 @@ const RDF_MIMES = new Set([
   'application/trig',
 ]);
 
-/** Preferred Accept header for content negotiation */
+/** Preferred Accept header for content negotiation — RDF formats in priority order, HTML last */
 const RDF_ACCEPT =
-  'text/turtle,application/n-triples,application/n-quads,application/rdf+xml,application/ld+json,text/html';
+  'text/turtle;q=1.0,application/ld+json;q=0.9,application/rdf+xml;q=0.8,application/n-triples;q=0.7,text/n3;q=0.6,application/n-quads;q=0.6,application/trig;q=0.6,text/html;q=0.3';
 
 /** Simple but robust Link header parser (handles both HTTP Link and application/linkset) */
 function parseLinkHeader(header: string | null): Array<{ url: string; [key: string]: string }> {
@@ -173,6 +173,30 @@ async function fetchRDF(url: string): Promise<Response> {
   return fetchWithRedirect(url, {
     headers: { Accept: RDF_ACCEPT },
   });
+}
+
+/**
+ * When the initial content-negotiation fetch does not yield an HTML body
+ * (e.g. the fetch failed, the server returned a non-HTML error response, or
+ * the body was an RDF payload that was already consumed), fetch the URI as
+ * plain HTML so that HTML signposting strategies can still run.
+ *
+ * Returns the HTML body string and the Link header from the fallback response.
+ * Both will be empty/null if the fallback also fails or returns non-HTML.
+ */
+async function fetchHtmlFallback(uri: string): Promise<{ body: string; linkHeader: string | null }> {
+  try {
+    const res = await fetchWithRedirect(uri, {
+      headers: { Accept: 'text/html,application/xhtml+xml,*/*;q=0.3' },
+    });
+    if (res.ok) {
+      const ct = baseMime(res.headers.get('content-type'));
+      if (ct === 'text/html' || ct === 'application/xhtml+xml') {
+        return { body: await res.text(), linkHeader: res.headers.get('link') };
+      }
+    }
+  } catch { /* ignore — proceed with empty body */ }
+  return { body: '', linkHeader: null };
 }
 
 /**
@@ -742,6 +766,17 @@ export async function extractAllRDF(uri: string): Promise<RDFOverview> {
   }
   if (!cnFound) notFound.push('content-negotiation');
 
+  // If the discovery fetch returned RDF (body was discarded) or failed entirely,
+  // perform a separate plain-HTML fetch so that HTML signposting strategies
+  // (S4–S6) still have a chance to discover additional RDF sources.
+  if (!bodyText) {
+    const { body: fallbackBody, linkHeader: fallbackLink } = await fetchHtmlFallback(uri);
+    if (fallbackBody) {
+      bodyText = fallbackBody;
+      if (!linkHeader) linkHeader = fallbackLink;
+    }
+  }
+
   const htmlHints = bodyText
     ? extractHtmlHints(bodyText)
     : { describedByLinks: [], linksets: [], embeddedScripts: [] };
@@ -954,6 +989,21 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
     }
   }
 
+  // 2. HTTP Link headers (FAIR signposting + linksets)
+  let linkHeader = res ? res.headers.get('link') : null;
+
+  // If the content negotiation fetch did not yield an HTML body (e.g. it failed,
+  // the server returned a non-HTML error, or the server does not honour the RDF
+  // Accept types), perform a separate plain-HTML fetch so that HTML signposting
+  // strategies (S4–S6) always have a chance to discover RDF.
+  if (!bodyText) {
+    const { body: fallbackBody, linkHeader: fallbackLink } = await fetchHtmlFallback(uri);
+    if (fallbackBody) {
+      bodyText = fallbackBody;
+      if (!linkHeader) linkHeader = fallbackLink;
+    }
+  }
+
   let htmlDoc: Document | null = null;
   if (bodyText) {
     try {
@@ -969,8 +1019,6 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
     ? extractHtmlHints(bodyText)
     : { describedByLinks: [], linksets: [], embeddedScripts: [] };
 
-  // 2. HTTP Link headers (FAIR signposting + linksets)
-  const linkHeader = res ? res.headers.get('link') : null;
   const links = parseLinkHeader(linkHeader);
 
   // Describedby from Link header

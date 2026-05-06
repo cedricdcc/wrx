@@ -201,13 +201,17 @@ The charts below expand each strategy from the main extraction flow.
 ```mermaid
 flowchart TD
   S1_START(["S1 start: fetchRDF(uri)"]) --> S1_FETCH{"Initial fetch succeeded?"}
-  S1_FETCH -->|no| S1_NULL(["Return null (network/fetch failure)"])
+  S1_FETCH -->|no| S1_FALLBACK(["bodyText empty → HTML fallback fetch"])
   S1_FETCH -->|yes| S1_CT{"Response Content-Type is RDF MIME and response is ok?"}
   S1_CT -->|yes| S1_OK(["Return source: content-negotiation"])
-  S1_CT -->|no| S1_NEXT(["Continue to S2"])
+  S1_CT -->|no| S1_BODY{"Body is HTML?"}
+  S1_BODY -->|yes| S1_NEXT(["Continue to S2 — use body for signposting"])
+  S1_BODY -->|no| S1_FALLBACK
+  S1_FALLBACK --> S1_HFETCH{"Plain-HTML fetch succeeded and returned HTML?"}
+  S1_HFETCH -->|yes| S1_NEXT
+  S1_HFETCH -->|no| S1_NEXT
 
   style S1_OK fill:#2d6a4f,color:#fff
-  style S1_NULL fill:#9d0208,color:#fff
 ```
 
 ### S2 — HTTP Link Header DescribedBy/Profile
@@ -478,6 +482,12 @@ The module relies exclusively on Bun built-ins (`fetch`, `URL`, `DOMParser`, `Re
 
 ### Graceful failure
 Every network call is wrapped in `try/catch`. A failure in any step causes a fall-through to the next strategy rather than an exception — `null` is returned only when all strategies are exhausted.
+
+### HTML fallback when content negotiation yields no HTML body
+
+When the initial `fetchRDF()` call (which includes `text/html` in its Accept header) does not produce an HTML body — either because it throws a network error, the server returns a non-HTML error response, or the server returns non-HTML/non-RDF content — both `extractRDF` and `extractAllRDF` automatically perform a second plain-HTML fetch (`Accept: text/html,application/xhtml+xml`). If this fallback succeeds and returns HTML, its body is used for all subsequent HTML signposting strategies (S4–S6) and its `Link` header is used for strategies S2–S3 when none was previously captured. This ensures that HTML signposting is never skipped due to an unhelpful response to the RDF content negotiation request.
+
+In `extractAllRDF`, this fallback also fires when the discovery fetch returns RDF (the body is discarded in that case), allowing the comprehensive scan to find RDF sources advertised via HTML signposting in addition to those found via content negotiation.
 
 ### RFC 9264 linkset support
 Both serialisations are supported:
