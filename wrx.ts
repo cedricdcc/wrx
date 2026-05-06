@@ -50,15 +50,8 @@ const RDF_MIMES = new Set([
 ]);
 
 /** Preferred Accept header for content negotiation */
-const RDF_ACCEPT = [
-  'text/turtle',
-  'application/ld+json',
-  'application/rdf+xml',
-  'application/n-triples',
-  'text/n3',
-  'application/n-quads',
-  'application/trig',
-].join(',');
+const RDF_ACCEPT =
+  'text/turtle,application/n-triples,application/n-quads,application/rdf+xml,application/ld+json,text/html';
 
 /** Simple but robust Link header parser (handles both HTTP Link and application/linkset) */
 function parseLinkHeader(header: string | null): Array<{ url: string; [key: string]: string }> {
