@@ -665,6 +665,86 @@ describe('extractRDF', () => {
     expect(result?.format).toBe('text/turtle');
     expect(result?.content).toBe(TURTLE_BODY);
   });
+
+  // When the RDF content negotiation fetch returns a non-HTML, non-RDF body
+  // (e.g. an empty 406 error), the module must fall back to a plain-HTML fetch
+  // so that HTML signposting strategies can still discover RDF.
+  test('falls back to HTML fetch when content negotiation yields no HTML body', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const URI = 'https://data.example/no-html-from-conneg';
+    const TURTLE_BODY = '@prefix dct: <http://purl.org/dc/terms/> . <> a dct:Dataset .';
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
+
+      if (url === URI) {
+        // Simulate a server that rejects the RDF Accept header with an empty 406
+        if (accept.includes('text/turtle')) {
+          return new Response('', { status: 406, headers: { 'content-type': 'text/plain' } });
+        }
+        // Plain-HTML fallback fetch returns an HTML page with signposting
+        return new Response(
+          '<html><head><link rel="describedby" href="./data.ttl" type="text/turtle"></head></html>',
+          { status: 200, headers: { 'content-type': 'text/html' } }
+        );
+      }
+
+      if (url === 'https://data.example/data.ttl') {
+        return new Response(TURTLE_BODY, {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(URI);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('signposting-html-link');
+    expect(result?.format).toBe('text/turtle');
+    expect(result?.content).toBe(TURTLE_BODY);
+  });
+
+  // When the initial fetch throws entirely (e.g. network error), the module must
+  // still attempt a plain-HTML fetch and run HTML signposting strategies.
+  test('falls back to HTML fetch when initial fetch throws a network error', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const URI = 'https://data.example/throws-on-rdf-accept';
+    const JSONLD_BODY = JSON.stringify({ '@context': 'https://schema.org/', '@type': 'Dataset' });
+    let callCount = 0;
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      callCount += 1;
+
+      if (url === URI && callCount === 1) {
+        // First fetch (RDF content negotiation) — simulate network error
+        throw new TypeError('Failed to fetch');
+      }
+
+      if (url === URI) {
+        // HTML fallback fetch returns page with embedded JSON-LD
+        return new Response(
+          '<html><body><script type="application/ld+json">' + JSONLD_BODY + '</script></body></html>',
+          { status: 200, headers: { 'content-type': 'text/html' } }
+        );
+      }
+
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(URI);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('embedded-script');
+    expect(result?.format).toBe('application/ld+json');
+    expect(result?.content).toBe(JSONLD_BODY);
+  });
 });
 
 describe('extractAllRDF', () => {
@@ -728,5 +808,59 @@ describe('extractAllRDF', () => {
     expect(sitemapStep.strategy).toBe(6);
     expect(sitemapStep.found).toBe(false);
     expect(sitemapStep.hits).toEqual([]);
+  });
+
+  // When content negotiation succeeds (returns RDF), the HTML body is discarded.
+  // The module must make a separate plain-HTML fetch so that HTML signposting
+  // strategies run and can report additional RDF sources.
+  test('discovers HTML signposting sources even when content negotiation succeeds', async () => {
+    delete (globalThis as { DOMParser?: unknown }).DOMParser;
+
+    const URI = 'https://data.example/dual-source';
+    const CN_RDF = '@prefix : <https://example/cn/> . :s :p :o .';
+    const HTML_RDF = '@prefix : <https://example/html/> . :x :y :z .';
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
+
+      if (url === URI) {
+        // Returns Turtle when asked with a specific MIME (individual conneg probes)
+        if (accept === 'text/turtle') {
+          return new Response(CN_RDF, {
+            status: 200,
+            headers: { 'content-type': 'text/turtle' },
+          });
+        }
+        // Returns HTML for the plain-HTML fallback fetch
+        if (accept.startsWith('text/html')) {
+          return new Response(
+            `<html><head><link rel="describedby" href="${URI}.extra.ttl" type="text/turtle"></head></html>`,
+            { status: 200, headers: { 'content-type': 'text/html' } }
+          );
+        }
+        // Discovery fetch (multi-MIME Accept) also returns Turtle
+        return new Response(CN_RDF, {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+
+      if (url === `${URI}.extra.ttl`) {
+        return new Response(HTML_RDF, {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const overview = await extractAllRDF(URI);
+
+    // Content negotiation should have found RDF
+    expect(overview.found.some((r) => r.source === 'content-negotiation')).toBe(true);
+    // HTML signposting should also have found RDF from the HTML fallback fetch
+    expect(overview.found.some((r) => r.source === 'signposting-html-link')).toBe(true);
   });
 });
