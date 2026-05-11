@@ -2,11 +2,11 @@ import { StrategyName } from './types'
 
 export const STRATEGY_ORDER: StrategyName[] = [
   'content-negotiation',
-  'link-header',
+  'signposting-link-header',
   'linkset',
-  'html-signposting',
-  'embedded-rdf',
-  'sitemap',
+  'signposting-html-link',
+  'embedded-script',
+  'sitemap-signposting',
 ]
 
 export const RDF_MIMES = [
@@ -15,6 +15,7 @@ export const RDF_MIMES = [
   'application/rdf+xml',
   'application/n-triples',
   'application/n-quads',
+  'application/trig',
   'text/n3',
 ]
 
