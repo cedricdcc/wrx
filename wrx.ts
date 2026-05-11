@@ -3,22 +3,17 @@
 // Run with: bun run wrx.js (or import the function in your Bun project)
 // No external dependencies — uses only built-in Bun/fetch + DOMParser (available in Bun).
 
-export interface ExtractedRDF {
-  /** The raw RDF content (as string) */
-  content: string;
-  /** The Content-Type / MIME of the RDF (e.g. "text/turtle", "application/ld+json") */
-  format: string;
-  /** Where the RDF was obtained from */
-  source:
-    | 'content-negotiation'
-    | 'signposting-link-header'
-    | 'signposting-html-link'
-    | 'embedded-script'
-    | 'linkset'
-    | 'sitemap-signposting';
-  /** The URL the RDF was ultimately fetched from */
-  url: string;
-}
+import {
+  ExtractedRDF,
+  ContentNegotiationResult,
+  RDFOverview,
+  LinkRelationOption,
+  LinkRelationObservation,
+  LinkRelationOrigin,
+  ParsedCliArgs,
+} from './src/core/types';
+
+import { STRATEGY_ORDER, RDF_MIME_SET, RDF_ACCEPT } from './src/core/constants';
 
 const STRATEGY_LABELS: Record<ExtractedRDF['source'], string> = {
   'content-negotiation':    'Content Negotiation',
@@ -28,52 +23,6 @@ const STRATEGY_LABELS: Record<ExtractedRDF['source'], string> = {
   'embedded-script':        'Embedded RDF script',
   'sitemap-signposting':    'Sitemap signposting (robots.txt)',
 };
-
-const STRATEGY_ORDER: ExtractedRDF['source'][] = [
-  'content-negotiation',
-  'signposting-link-header',
-  'linkset',
-  'signposting-html-link',
-  'embedded-script',
-  'sitemap-signposting',
-];
-
-type LinkRelationOrigin = 'http-link-header' | 'html-link' | 'linkset';
-
-interface LinkRelationOption {
-  key: string;
-  value: string;
-}
-
-interface LinkRelationObservation {
-  anchor: string;
-  rel: string;
-  href: string;
-  options: LinkRelationOption[];
-  origin: LinkRelationOrigin;
-}
-
-interface ParsedCliArgs {
-  allMode: boolean;
-  profileMode: boolean;
-  extendLinksMode: boolean;
-  url: string | null;
-}
-
-/** MIME types we consider valid RDF serializations */
-const RDF_MIMES = new Set([
-  'text/turtle',
-  'application/ld+json',
-  'application/rdf+xml',
-  'application/n-triples',
-  'text/n3',
-  'application/n-quads',
-  'application/trig',
-]);
-
-/** Preferred Accept header for content negotiation — RDF formats in priority order, HTML last */
-const RDF_ACCEPT =
-  'text/turtle;q=1.0,application/ld+json;q=0.9,application/rdf+xml;q=0.8,application/n-triples;q=0.7,text/n3;q=0.6,application/n-quads;q=0.6,application/trig;q=0.6,text/html;q=0.3';
 
 /** Simple but robust Link header parser (handles both HTTP Link and application/linkset) */
 function parseLinkHeader(header: string | null): Array<{ url: string; [key: string]: string }> {
@@ -106,7 +55,7 @@ function parseLinkHeader(header: string | null): Array<{ url: string; [key: stri
 
 /** Check if a MIME type is RDF */
 function isRDFMime(mime: string): boolean {
-  return RDF_MIMES.has(mime.toLowerCase().trim());
+  return RDF_MIME_SET.has(mime.toLowerCase().trim());
 }
 
 /** Check if a MIME type is a linkset format */
@@ -845,20 +794,6 @@ async function tryExtractFromSitemapAndDCAT(uri: string): Promise<ExtractedRDF |
   return null;
 }
 
-/** Result of a single per-MIME-type content negotiation attempt (used in --all mode) */
-export interface ContentNegotiationResult {
-  /** The MIME type requested in the Accept header */
-  requestedMime: string;
-  /** The Content-Type returned by the server */
-  responseMime: string;
-  /** Number of characters in the response body */
-  chars: number;
-  /** Whether the response Content-Type is a recognised RDF serialization */
-  isRdf: boolean;
-  /** The final URL after any redirects */
-  url: string;
-}
-
 /** Full strategy-by-strategy execution trace (in the same order as the paper flow) */
 export interface StrategyTraceStep {
   /** 1-based strategy index in the extraction flow */
@@ -875,22 +810,6 @@ export interface StrategyTraceStep {
     url: string;
     chars: number;
   }>;
-}
-
-/** Overview of all RDF sources discovered across every extraction strategy */
-export interface RDFOverview {
-  /** All RDF sources that were successfully extracted */
-  found: ExtractedRDF[];
-  /** Names of strategies that were tried but yielded no RDF */
-  notFound: Array<ExtractedRDF['source']>;
-  /**
-   * Per-MIME-type content negotiation results (one entry per MIME type tried).
-   * Populated by extractAllRDF(); includes both RDF and non-RDF responses so
-   * callers can see exactly what the server returned for each Accept value.
-   */
-  contentNegotiations: ContentNegotiationResult[];
-  /** Full strategy trace from start to finish (ordered, with per-strategy outcomes) */
-  trace: StrategyTraceStep[];
 }
 
 /** Collect ALL RDF hits from a linkset (does not stop on first success) */
