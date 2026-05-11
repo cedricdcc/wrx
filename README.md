@@ -27,4 +27,38 @@ if (result) {
 
 When working in this repository directly, import from `./wrx.js`.
 
+### CLI
+
+Quick first-match mode:
+
+```sh
+bun run wrx.js https://example.org/dataset
+```
+
+Explore all extraction strategies:
+
+```sh
+bun run wrx.js --all https://example.org/dataset
+```
+
+Extend CLI output with modeled web-link relations (JSON + xhtml Turtle-like block):
+
+```sh
+bun run wrx.js --extend-links https://example.org/dataset
+```
+
+Enable post-harvest profile hook placeholder:
+
+```sh
+bun run wrx.js --profile https://example.org/dataset
+```
+
+Flags can be combined, for example:
+
+```sh
+bun run wrx.js --all --extend-links --profile https://example.org/dataset
+```
+
+`--profile` is currently a placeholder step and intentionally does not perform profile extraction yet.
+
 This package targets Bun runtime APIs.

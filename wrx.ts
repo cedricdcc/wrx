@@ -38,6 +38,28 @@ const STRATEGY_ORDER: ExtractedRDF['source'][] = [
   'sitemap-signposting',
 ];
 
+type LinkRelationOrigin = 'http-link-header' | 'html-link' | 'linkset';
+
+interface LinkRelationOption {
+  key: string;
+  value: string;
+}
+
+interface LinkRelationObservation {
+  anchor: string;
+  rel: string;
+  href: string;
+  options: LinkRelationOption[];
+  origin: LinkRelationOrigin;
+}
+
+interface ParsedCliArgs {
+  allMode: boolean;
+  profileMode: boolean;
+  extendLinksMode: boolean;
+  url: string | null;
+}
+
 /** MIME types we consider valid RDF serializations */
 const RDF_MIMES = new Set([
   'text/turtle',
@@ -106,6 +128,359 @@ function relHasToken(rel: string | null | undefined, token: string): boolean {
     .toLowerCase()
     .split(/\s+/)
     .some((r) => r.trim() === token);
+}
+
+function splitRelValues(rel: string | null | undefined): string[] {
+  if (!rel) return [];
+  return rel
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function isAbsoluteUri(value: string): boolean {
+  return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value);
+}
+
+function parseCliArgs(args: string[]): ParsedCliArgs {
+  let allMode = false;
+  let profileMode = false;
+  let extendLinksMode = false;
+  let url: string | null = null;
+
+  for (const arg of args) {
+    if (arg === '--all') {
+      allMode = true;
+      continue;
+    }
+    if (arg === '--profile') {
+      profileMode = true;
+      continue;
+    }
+    if (arg === '--extend-links') {
+      extendLinksMode = true;
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      throw new Error(`Unknown flag: ${arg}`);
+    }
+    if (!url) {
+      url = arg;
+      continue;
+    }
+    throw new Error(`Unexpected extra positional argument: ${arg}`);
+  }
+
+  return { allMode, profileMode, extendLinksMode, url };
+}
+
+function formatOptionsForKey(options: LinkRelationOption[]): string {
+  return options
+    .slice()
+    .sort((a, b) => {
+      if (a.key === b.key) return a.value.localeCompare(b.value);
+      return a.key.localeCompare(b.key);
+    })
+    .map((opt) => `${opt.key}=${opt.value}`)
+    .join('|');
+}
+
+function relationKey(item: LinkRelationObservation): string {
+  return [item.anchor, item.rel, item.href, item.origin, formatOptionsForKey(item.options)].join('::');
+}
+
+function addLinkRelation(
+  items: LinkRelationObservation[],
+  seen: Set<string>,
+  item: LinkRelationObservation
+): void {
+  const key = relationKey(item);
+  if (seen.has(key)) return;
+  seen.add(key);
+  items.push(item);
+}
+
+function sanitizeRelationToken(rel: string): string {
+  return rel.trim();
+}
+
+function collectFromParsedLinkEntries(
+  entries: Array<{ url: string; [key: string]: string }>,
+  defaultAnchor: string,
+  origin: LinkRelationOrigin,
+  sink: LinkRelationObservation[],
+  seen: Set<string>,
+  baseForTargetResolution: string
+): void {
+  for (const entry of entries) {
+    const relValues = splitRelValues(entry['rel']);
+    if (relValues.length === 0) continue;
+
+    const hrefRaw = entry['url'];
+    if (!hrefRaw) continue;
+
+    let href: string;
+    try {
+      href = new URL(hrefRaw, baseForTargetResolution).toString();
+    } catch {
+      continue;
+    }
+
+    const anchorRaw = entry['anchor'];
+    let anchor = defaultAnchor;
+    if (anchorRaw) {
+      try {
+        anchor = new URL(anchorRaw, baseForTargetResolution).toString();
+      } catch {
+        anchor = defaultAnchor;
+      }
+    }
+
+    const options: LinkRelationOption[] = Object.entries(entry)
+      .filter(([key]) => key !== 'url' && key !== 'rel' && key !== 'anchor')
+      .map(([key, value]) => ({ key, value }));
+
+    for (const rel of relValues) {
+      const relToken = sanitizeRelationToken(rel);
+      if (!relToken) continue;
+      addLinkRelation(sink, seen, { anchor, rel: relToken, href, options, origin });
+    }
+  }
+}
+
+function collectFromHtmlHints(
+  uri: string,
+  htmlHints: ReturnType<typeof extractHtmlHints>,
+  sink: LinkRelationObservation[],
+  seen: Set<string>
+): void {
+  for (const link of htmlHints.describedByLinks) {
+    try {
+      const href = new URL(link.href, uri).toString();
+      const options: LinkRelationOption[] = link.type ? [{ key: 'type', value: link.type }] : [];
+      addLinkRelation(sink, seen, {
+        anchor: uri,
+        rel: 'describedby',
+        href,
+        options,
+        origin: 'html-link',
+      });
+    } catch {
+      // Skip malformed href entries.
+    }
+  }
+
+  for (const linkset of htmlHints.linksets) {
+    try {
+      const href = new URL(linkset, uri).toString();
+      addLinkRelation(sink, seen, {
+        anchor: uri,
+        rel: 'linkset',
+        href,
+        options: [],
+        origin: 'html-link',
+      });
+    } catch {
+      // Skip malformed href entries.
+    }
+  }
+}
+
+function collectFromJsonLinksetContext(
+  context: Record<string, unknown>,
+  linksetUrl: string,
+  baseUri: string,
+  sink: LinkRelationObservation[],
+  seen: Set<string>
+): void {
+  const anchorValue = typeof context['anchor'] === 'string' ? context['anchor'] : baseUri;
+  let anchor = baseUri;
+  try {
+    anchor = new URL(anchorValue, linksetUrl).toString();
+  } catch {
+    anchor = baseUri;
+  }
+
+  for (const [relName, rawVal] of Object.entries(context)) {
+    if (relName === 'anchor') continue;
+    if (!Array.isArray(rawVal)) continue;
+    for (const item of rawVal) {
+      if (typeof item !== 'object' || item === null) continue;
+      const row = item as Record<string, unknown>;
+      if (typeof row.href !== 'string') continue;
+      let href: string;
+      try {
+        href = new URL(row.href, linksetUrl).toString();
+      } catch {
+        continue;
+      }
+      const options: LinkRelationOption[] = Object.entries(row)
+        .filter(([key]) => key !== 'href')
+        .filter(([, value]) => typeof value === 'string')
+        .map(([key, value]) => ({ key, value: value as string }));
+      addLinkRelation(sink, seen, {
+        anchor,
+        rel: relName,
+        href,
+        options,
+        origin: 'linkset',
+      });
+    }
+  }
+}
+
+async function collectLinkRelationsFromLinkset(
+  linksetUrl: string,
+  baseUri: string,
+  sink: LinkRelationObservation[],
+  seen: Set<string>
+): Promise<void> {
+  const acceptLinkset = 'application/linkset+json;q=1.0, application/ld+json;q=0.9, application/linkset;q=0.8';
+
+  let res: Response;
+  try {
+    res = await fetchWithRedirect(linksetUrl, { headers: { Accept: acceptLinkset } });
+    if (!res.ok) return;
+  } catch {
+    return;
+  }
+
+  const ct = baseMime(res.headers.get('content-type'));
+  if (ct === 'application/linkset+json' || ct === 'application/json' || ct === 'application/ld+json') {
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      return;
+    }
+    const linkset = (data as { linkset?: Array<Record<string, unknown>> } | null)?.linkset;
+    if (!Array.isArray(linkset)) return;
+    for (const ctx of linkset) {
+      collectFromJsonLinksetContext(ctx, linksetUrl, baseUri, sink, seen);
+    }
+    return;
+  }
+
+  if (ct === 'application/linkset') {
+    let text: string;
+    try {
+      text = await res.text();
+    } catch {
+      return;
+    }
+    const links = parseLinkHeader(text.replace(/[\r\n\t]+/g, ' '));
+    collectFromParsedLinkEntries(links, baseUri, 'linkset', sink, seen, linksetUrl);
+  }
+}
+
+async function collectLinkRelationsForUri(uri: string): Promise<LinkRelationObservation[]> {
+  const relations: LinkRelationObservation[] = [];
+  const seen = new Set<string>();
+
+  let bodyText = '';
+  let linkHeader: string | null = null;
+  try {
+    const discovery = await fetchRDF(uri);
+    linkHeader = discovery.headers.get('link');
+    const ct = baseMime(discovery.headers.get('content-type'));
+    if (!isRDFMime(ct) || !discovery.ok) {
+      try {
+        bodyText = await discovery.text();
+      } catch {
+        bodyText = '';
+      }
+    } else {
+      try {
+        await discovery.text();
+      } catch {
+        // Ignore body read errors while collecting links.
+      }
+    }
+  } catch {
+    // Continue with fallback HTML fetch.
+  }
+
+  if (!bodyText) {
+    const fallback = await fetchHtmlFallback(uri);
+    if (fallback.body) {
+      bodyText = fallback.body;
+      if (!linkHeader) linkHeader = fallback.linkHeader;
+    }
+  }
+
+  const headerLinks = parseLinkHeader(linkHeader);
+  collectFromParsedLinkEntries(headerLinks, uri, 'http-link-header', relations, seen, uri);
+
+  const htmlHints = bodyText
+    ? extractHtmlHints(bodyText)
+    : { describedByLinks: [], linksets: [], embeddedScripts: [] };
+  collectFromHtmlHints(uri, htmlHints, relations, seen);
+
+  const linksetTargets = new Set<string>();
+  for (const link of headerLinks) {
+    const relValues = splitRelValues(link['rel']);
+    if (!relValues.includes('linkset')) continue;
+    try {
+      linksetTargets.add(new URL(link['url'], uri).toString());
+    } catch {
+      // Skip malformed linkset URL.
+    }
+  }
+  for (const href of htmlHints.linksets) {
+    try {
+      linksetTargets.add(new URL(href, uri).toString());
+    } catch {
+      // Skip malformed linkset URL.
+    }
+  }
+
+  for (const lsUrl of linksetTargets) {
+    await collectLinkRelationsFromLinkset(lsUrl, uri, relations, seen);
+  }
+
+  return relations;
+}
+
+function escapeLiteral(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function renderRelForTurtle(rel: string): string {
+  return isAbsoluteUri(rel) ? `<${rel}>` : `"${escapeLiteral(rel)}"`;
+}
+
+function renderLinkRelationsJson(relations: LinkRelationObservation[]): string {
+  return JSON.stringify(
+    relations.map((rel) => ({
+      anchor: rel.anchor,
+      rel: rel.rel,
+      href: rel.href,
+      origin: rel.origin,
+      options: rel.options,
+    })),
+    null,
+    2
+  );
+}
+
+function renderLinkRelationsTurtle(relations: LinkRelationObservation[]): string {
+  const lines: string[] = ['@prefix xhtml: <http://www.w3.org/1999/xhtml>.', ''];
+  for (const rel of relations) {
+    lines.push('[] a xhtml:link;');
+    lines.push(`   xhtml:anchor <${rel.anchor}>;`);
+    lines.push(`   xhtml:rel ${renderRelForTurtle(rel.rel)};`);
+    lines.push(`   xhtml:href <${rel.href}>;`);
+    if (rel.options.length > 0) {
+      const optionNodes = rel.options.map((opt) => {
+        return `[ a xhtml:LinkOption;\n       xhtml:optionKey \"${escapeLiteral(opt.key)}\";\n       xhtml:optionVal \"${escapeLiteral(opt.value)}\" ]`;
+      });
+      lines.push(`   xhtml:option ${optionNodes.join(',\n                ')}.`);
+    } else {
+      lines.push('   xhtml:option [].');
+    }
+    lines.push('');
+  }
+  return lines.join('\n').trimEnd();
 }
 
 function parseTagAttributes(tagText: string): Record<string, string> {
@@ -1199,17 +1574,29 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
 //   bun run wrx.js <URI>          — return first RDF found
 //   bun run wrx.js --all <URI>    — explore all paths and print overview
 export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise<void> {
-  const allMode = args.includes('--all');
-  const url = args.find((a: string) => a !== '--all');
-
-  if (!url) {
-    console.error('Usage: bun run wrx.js [--all] <URI>');
+  let parsed: ParsedCliArgs;
+  try {
+    parsed = parseCliArgs(args);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid CLI arguments.';
+    console.error(message);
+    console.error('Usage: bun run wrx.js [--all] [--profile] [--extend-links] <URI>');
     process.exit(1);
   }
+
+  const { allMode, profileMode, extendLinksMode, url } = parsed;
+
+  if (!url) {
+    console.error('Usage: bun run wrx.js [--all] [--profile] [--extend-links] <URI>');
+    process.exit(1);
+  }
+
+  let harvestedOverview: RDFOverview | null = null;
 
   if (allMode) {
     console.log(`🔍 Exploring all RDF paths for: ${url}\n`);
     const overview = await extractAllRDF(url);
+    harvestedOverview = overview;
 
     // Group found entries by source for display
     const bySource = new Map<string, ExtractedRDF[]>();
@@ -1277,7 +1664,10 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
     }
   } else {
     console.log(`🔍 Extracting RDF from: ${url}`);
-    const result = await extractRDF(url);
+    const shouldRunFullHarvest = profileMode;
+    const result = shouldRunFullHarvest
+      ? ((harvestedOverview = await extractAllRDF(url)), harvestedOverview.found[0] ?? null)
+      : await extractRDF(url);
     if (result) {
       console.log(`✅ Found RDF (${result.source}) from ${result.url}`);
       console.log(`Format: ${result.format}`);
@@ -1287,6 +1677,23 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
     } else {
       console.log('❌ No RDF found after trying all strategies.');
     }
+  }
+
+  if (extendLinksMode) {
+    const relations = await collectLinkRelationsForUri(url);
+    console.log('');
+    console.log('🔗 Extended Link Relations (JSON):');
+    console.log(renderLinkRelationsJson(relations));
+    console.log('');
+    console.log('🔗 Extended Link Relations (xhtml Turtle-like):');
+    console.log(renderLinkRelationsTurtle(relations));
+  }
+
+  if (profileMode) {
+    const harvestCount = harvestedOverview ? harvestedOverview.found.length : 0;
+    console.log('');
+    console.log(`🧪 --profile placeholder: harvested ${harvestCount} RDF source(s).`);
+    console.log('TODO: profile discovery step is reserved and intentionally not implemented yet.');
   }
 }
 

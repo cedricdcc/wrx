@@ -449,6 +449,27 @@ Example output:
 
 > **Note:** `text/n3` returned `text/turtle` in the example above, which is the same format as the first request. The `found` array deduplicates by response format, so both requests count in `contentNegotiations` but only one entry appears in `found`.
 
+### CLI flags: `--extend-links` and `--profile`
+
+`wrx` supports additional CLI flags for post-harvest behavior:
+
+- `--extend-links`: prints modeled web-link relations discovered during harvesting as:
+  - JSON summary
+  - Turtle-like `xhtml:link` statements
+- `--profile`: runs an additional post-harvest placeholder step and prints a TODO message (profile extraction logic intentionally not implemented yet).
+
+Examples:
+
+```sh
+# Add modeled relation output in first-match mode
+bun run wrx.js --extend-links https://example.org/dataset
+
+# Full strategy overview + extended relations + profile placeholder
+bun run wrx.js --all --extend-links --profile https://example.org/dataset
+```
+
+The `--extend-links` relation model focuses on web links discovered in harvesting flows (HTTP Link headers, HTML `<link>` hints, and linkset entries), not RDF graph parsing.
+
 ### As a library — `extractAllRDF`
 
 ```typescript

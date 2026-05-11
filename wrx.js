@@ -1,3 +1,4 @@
+// @bun
 // wrx.ts
 var STRATEGY_LABELS = {
   "content-negotiation": "Content Negotiation",
@@ -71,6 +72,285 @@ function relHasToken(rel, token) {
   if (!rel)
     return false;
   return rel.toLowerCase().split(/\s+/).some((r) => r.trim() === token);
+}
+function splitRelValues(rel) {
+  if (!rel)
+    return [];
+  return rel.split(/\s+/).map((item) => item.trim()).filter(Boolean);
+}
+function isAbsoluteUri(value) {
+  return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value);
+}
+function parseCliArgs(args) {
+  let allMode = false;
+  let profileMode = false;
+  let extendLinksMode = false;
+  let url = null;
+  for (const arg of args) {
+    if (arg === "--all") {
+      allMode = true;
+      continue;
+    }
+    if (arg === "--profile") {
+      profileMode = true;
+      continue;
+    }
+    if (arg === "--extend-links") {
+      extendLinksMode = true;
+      continue;
+    }
+    if (arg.startsWith("--")) {
+      throw new Error(`Unknown flag: ${arg}`);
+    }
+    if (!url) {
+      url = arg;
+      continue;
+    }
+    throw new Error(`Unexpected extra positional argument: ${arg}`);
+  }
+  return { allMode, profileMode, extendLinksMode, url };
+}
+function formatOptionsForKey(options) {
+  return options.slice().sort((a, b) => {
+    if (a.key === b.key)
+      return a.value.localeCompare(b.value);
+    return a.key.localeCompare(b.key);
+  }).map((opt) => `${opt.key}=${opt.value}`).join("|");
+}
+function relationKey(item) {
+  return [item.anchor, item.rel, item.href, item.origin, formatOptionsForKey(item.options)].join("::");
+}
+function addLinkRelation(items, seen, item) {
+  const key = relationKey(item);
+  if (seen.has(key))
+    return;
+  seen.add(key);
+  items.push(item);
+}
+function sanitizeRelationToken(rel) {
+  return rel.trim();
+}
+function collectFromParsedLinkEntries(entries, defaultAnchor, origin, sink, seen, baseForTargetResolution) {
+  for (const entry of entries) {
+    const relValues = splitRelValues(entry["rel"]);
+    if (relValues.length === 0)
+      continue;
+    const hrefRaw = entry["url"];
+    if (!hrefRaw)
+      continue;
+    let href;
+    try {
+      href = new URL(hrefRaw, baseForTargetResolution).toString();
+    } catch {
+      continue;
+    }
+    const anchorRaw = entry["anchor"];
+    let anchor = defaultAnchor;
+    if (anchorRaw) {
+      try {
+        anchor = new URL(anchorRaw, baseForTargetResolution).toString();
+      } catch {
+        anchor = defaultAnchor;
+      }
+    }
+    const options = Object.entries(entry).filter(([key]) => key !== "url" && key !== "rel" && key !== "anchor").map(([key, value]) => ({ key, value }));
+    for (const rel of relValues) {
+      const relToken = sanitizeRelationToken(rel);
+      if (!relToken)
+        continue;
+      addLinkRelation(sink, seen, { anchor, rel: relToken, href, options, origin });
+    }
+  }
+}
+function collectFromHtmlHints(uri, htmlHints, sink, seen) {
+  for (const link of htmlHints.describedByLinks) {
+    try {
+      const href = new URL(link.href, uri).toString();
+      const options = link.type ? [{ key: "type", value: link.type }] : [];
+      addLinkRelation(sink, seen, {
+        anchor: uri,
+        rel: "describedby",
+        href,
+        options,
+        origin: "html-link"
+      });
+    } catch {}
+  }
+  for (const linkset of htmlHints.linksets) {
+    try {
+      const href = new URL(linkset, uri).toString();
+      addLinkRelation(sink, seen, {
+        anchor: uri,
+        rel: "linkset",
+        href,
+        options: [],
+        origin: "html-link"
+      });
+    } catch {}
+  }
+}
+function collectFromJsonLinksetContext(context, linksetUrl, baseUri, sink, seen) {
+  const anchorValue = typeof context["anchor"] === "string" ? context["anchor"] : baseUri;
+  let anchor = baseUri;
+  try {
+    anchor = new URL(anchorValue, linksetUrl).toString();
+  } catch {
+    anchor = baseUri;
+  }
+  for (const [relName, rawVal] of Object.entries(context)) {
+    if (relName === "anchor")
+      continue;
+    if (!Array.isArray(rawVal))
+      continue;
+    for (const item of rawVal) {
+      if (typeof item !== "object" || item === null)
+        continue;
+      const row = item;
+      if (typeof row.href !== "string")
+        continue;
+      let href;
+      try {
+        href = new URL(row.href, linksetUrl).toString();
+      } catch {
+        continue;
+      }
+      const options = Object.entries(row).filter(([key]) => key !== "href").filter(([, value]) => typeof value === "string").map(([key, value]) => ({ key, value }));
+      addLinkRelation(sink, seen, {
+        anchor,
+        rel: relName,
+        href,
+        options,
+        origin: "linkset"
+      });
+    }
+  }
+}
+async function collectLinkRelationsFromLinkset(linksetUrl, baseUri, sink, seen) {
+  const acceptLinkset = "application/linkset+json;q=1.0, application/ld+json;q=0.9, application/linkset;q=0.8";
+  let res;
+  try {
+    res = await fetchWithRedirect(linksetUrl, { headers: { Accept: acceptLinkset } });
+    if (!res.ok)
+      return;
+  } catch {
+    return;
+  }
+  const ct = baseMime(res.headers.get("content-type"));
+  if (ct === "application/linkset+json" || ct === "application/json" || ct === "application/ld+json") {
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      return;
+    }
+    const linkset = data?.linkset;
+    if (!Array.isArray(linkset))
+      return;
+    for (const ctx of linkset) {
+      collectFromJsonLinksetContext(ctx, linksetUrl, baseUri, sink, seen);
+    }
+    return;
+  }
+  if (ct === "application/linkset") {
+    let text;
+    try {
+      text = await res.text();
+    } catch {
+      return;
+    }
+    const links = parseLinkHeader(text.replace(/[\r\n\t]+/g, " "));
+    collectFromParsedLinkEntries(links, baseUri, "linkset", sink, seen, linksetUrl);
+  }
+}
+async function collectLinkRelationsForUri(uri) {
+  const relations = [];
+  const seen = new Set;
+  let bodyText = "";
+  let linkHeader = null;
+  try {
+    const discovery = await fetchRDF(uri);
+    linkHeader = discovery.headers.get("link");
+    const ct = baseMime(discovery.headers.get("content-type"));
+    if (!isRDFMime(ct) || !discovery.ok) {
+      try {
+        bodyText = await discovery.text();
+      } catch {
+        bodyText = "";
+      }
+    } else {
+      try {
+        await discovery.text();
+      } catch {}
+    }
+  } catch {}
+  if (!bodyText) {
+    const fallback = await fetchHtmlFallback(uri);
+    if (fallback.body) {
+      bodyText = fallback.body;
+      if (!linkHeader)
+        linkHeader = fallback.linkHeader;
+    }
+  }
+  const headerLinks = parseLinkHeader(linkHeader);
+  collectFromParsedLinkEntries(headerLinks, uri, "http-link-header", relations, seen, uri);
+  const htmlHints = bodyText ? extractHtmlHints(bodyText) : { describedByLinks: [], linksets: [], embeddedScripts: [] };
+  collectFromHtmlHints(uri, htmlHints, relations, seen);
+  const linksetTargets = new Set;
+  for (const link of headerLinks) {
+    const relValues = splitRelValues(link["rel"]);
+    if (!relValues.includes("linkset"))
+      continue;
+    try {
+      linksetTargets.add(new URL(link["url"], uri).toString());
+    } catch {}
+  }
+  for (const href of htmlHints.linksets) {
+    try {
+      linksetTargets.add(new URL(href, uri).toString());
+    } catch {}
+  }
+  for (const lsUrl of linksetTargets) {
+    await collectLinkRelationsFromLinkset(lsUrl, uri, relations, seen);
+  }
+  return relations;
+}
+function escapeLiteral(value) {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+}
+function renderRelForTurtle(rel) {
+  return isAbsoluteUri(rel) ? `<${rel}>` : `"${escapeLiteral(rel)}"`;
+}
+function renderLinkRelationsJson(relations) {
+  return JSON.stringify(relations.map((rel) => ({
+    anchor: rel.anchor,
+    rel: rel.rel,
+    href: rel.href,
+    origin: rel.origin,
+    options: rel.options
+  })), null, 2);
+}
+function renderLinkRelationsTurtle(relations) {
+  const lines = ["@prefix xhtml: <http://www.w3.org/1999/xhtml>.", ""];
+  for (const rel of relations) {
+    lines.push("[] a xhtml:link;");
+    lines.push(`   xhtml:anchor <${rel.anchor}>;`);
+    lines.push(`   xhtml:rel ${renderRelForTurtle(rel.rel)};`);
+    lines.push(`   xhtml:href <${rel.href}>;`);
+    if (rel.options.length > 0) {
+      const optionNodes = rel.options.map((opt) => {
+        return `[ a xhtml:LinkOption;
+       xhtml:optionKey "${escapeLiteral(opt.key)}";
+       xhtml:optionVal "${escapeLiteral(opt.value)}" ]`;
+      });
+      lines.push(`   xhtml:option ${optionNodes.join(`,
+                `)}.`);
+    } else {
+      lines.push("   xhtml:option [].");
+    }
+    lines.push("");
+  }
+  return lines.join(`
+`).trimEnd();
 }
 function parseTagAttributes(tagText) {
   const attrs = {};
@@ -919,16 +1199,26 @@ async function extractRDF(uri) {
   return null;
 }
 async function runWrxCli(args = process.argv.slice(2)) {
-  const allMode = args.includes("--all");
-  const url = args.find((a) => a !== "--all");
-  if (!url) {
-    console.error("Usage: bun run wrx.js [--all] <URI>");
+  let parsed;
+  try {
+    parsed = parseCliArgs(args);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid CLI arguments.";
+    console.error(message);
+    console.error("Usage: bun run wrx.js [--all] [--profile] [--extend-links] <URI>");
     process.exit(1);
   }
+  const { allMode, profileMode, extendLinksMode, url } = parsed;
+  if (!url) {
+    console.error("Usage: bun run wrx.js [--all] [--profile] [--extend-links] <URI>");
+    process.exit(1);
+  }
+  let harvestedOverview = null;
   if (allMode) {
     console.log(`\uD83D\uDD0D Exploring all RDF paths for: ${url}
 `);
     const overview = await extractAllRDF(url);
+    harvestedOverview = overview;
     const bySource = new Map;
     for (const entry of overview.found) {
       const key = entry.source;
@@ -944,33 +1234,33 @@ async function runWrxCli(args = process.argv.slice(2)) {
       if (source === "content-negotiation") {
         const rdfHits = overview.contentNegotiations.filter((r) => r.isRdf);
         if (rdfHits.length > 0) {
-          console.log(`  ✅ Strategy ${stratNum} — ${label} (${rdfHits.length} RDF format(s) found)`);
+          console.log(`  \u2705 Strategy ${stratNum} \u2014 ${label} (${rdfHits.length} RDF format(s) found)`);
         } else {
-          console.log(`  ❌ Strategy ${stratNum} — ${label}`);
+          console.log(`  \u274C Strategy ${stratNum} \u2014 ${label}`);
         }
         const reqW = overview.contentNegotiations.length > 0 ? Math.max(...overview.contentNegotiations.map((r) => r.requestedMime.length), "Requested MIME".length) : "Requested MIME".length;
         const resW = overview.contentNegotiations.length > 0 ? Math.max(...overview.contentNegotiations.map((r) => r.responseMime.length), "Response MIME".length) : "Response MIME".length;
-        console.log(`       ${"Requested MIME".padEnd(reqW)}  →  ${"Response MIME".padEnd(resW)}  Chars`);
-        console.log(`       ${"─".repeat(reqW)}     ${"─".repeat(resW)}  ─────`);
+        console.log(`       ${"Requested MIME".padEnd(reqW)}  \u2192  ${"Response MIME".padEnd(resW)}  Chars`);
+        console.log(`       ${"\u2500".repeat(reqW)}     ${"\u2500".repeat(resW)}  \u2500\u2500\u2500\u2500\u2500`);
         for (const cn of overview.contentNegotiations) {
-          const flag = cn.isRdf ? "✅" : "❌";
-          console.log(`       ${cn.requestedMime.padEnd(reqW)}  →  ${cn.responseMime.padEnd(resW)}  ${cn.chars.toLocaleString().padStart(7)}  ${flag}`);
+          const flag = cn.isRdf ? "\u2705" : "\u274C";
+          console.log(`       ${cn.requestedMime.padEnd(reqW)}  \u2192  ${cn.responseMime.padEnd(resW)}  ${cn.chars.toLocaleString().padStart(7)}  ${flag}`);
         }
       } else if (hits.length > 0) {
-        console.log(`  ✅ Strategy ${stratNum} — ${label}`);
+        console.log(`  \u2705 Strategy ${stratNum} \u2014 ${label}`);
         for (const hit of hits) {
           console.log(`       ${hit.format}  ${hit.url}  (${hit.content.length} chars)`);
         }
       } else {
-        console.log(`  ❌ Strategy ${stratNum} — ${label}`);
+        console.log(`  \u274C Strategy ${stratNum} \u2014 ${label}`);
       }
     }
     console.log("");
     if (overview.contentNegotiations.length > 0) {
       console.log("\uD83D\uDCCB Content Negotiation Overview (all MIME types):");
       for (const cn of overview.contentNegotiations) {
-        const flag = cn.isRdf ? "✅ RDF" : "❌ not RDF";
-        console.log(`   ${cn.requestedMime.padEnd(26)} → ${cn.chars.toLocaleString().padStart(7)} chars  (${cn.responseMime})  ${flag}`);
+        const flag = cn.isRdf ? "\u2705 RDF" : "\u274C not RDF";
+        console.log(`   ${cn.requestedMime.padEnd(26)} \u2192 ${cn.chars.toLocaleString().padStart(7)} chars  (${cn.responseMime})  ${flag}`);
       }
       console.log("");
     }
@@ -981,17 +1271,33 @@ async function runWrxCli(args = process.argv.slice(2)) {
     }
   } else {
     console.log(`\uD83D\uDD0D Extracting RDF from: ${url}`);
-    const result = await extractRDF(url);
+    const shouldRunFullHarvest = profileMode;
+    const result = shouldRunFullHarvest ? (harvestedOverview = await extractAllRDF(url), harvestedOverview.found[0] ?? null) : await extractRDF(url);
     if (result) {
-      console.log(`✅ Found RDF (${result.source}) from ${result.url}`);
+      console.log(`\u2705 Found RDF (${result.source}) from ${result.url}`);
       console.log(`Format: ${result.format}`);
       console.log(`Content length: ${result.content.length} chars`);
       console.log(`
 --- First 500 chars of RDF ---`);
       console.log(result.content.slice(0, 500) + (result.content.length > 500 ? "..." : ""));
     } else {
-      console.log("❌ No RDF found after trying all strategies.");
+      console.log("\u274C No RDF found after trying all strategies.");
     }
+  }
+  if (extendLinksMode) {
+    const relations = await collectLinkRelationsForUri(url);
+    console.log("");
+    console.log("\uD83D\uDD17 Extended Link Relations (JSON):");
+    console.log(renderLinkRelationsJson(relations));
+    console.log("");
+    console.log("\uD83D\uDD17 Extended Link Relations (xhtml Turtle-like):");
+    console.log(renderLinkRelationsTurtle(relations));
+  }
+  if (profileMode) {
+    const harvestCount = harvestedOverview ? harvestedOverview.found.length : 0;
+    console.log("");
+    console.log(`\uD83E\uDDEA --profile placeholder: harvested ${harvestCount} RDF source(s).`);
+    console.log("TODO: profile discovery step is reserved and intentionally not implemented yet.");
   }
 }
 if (import.meta.main) {

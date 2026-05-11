@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { extractAllRDF, extractRDF } from './wrx.js';
+import { extractAllRDF, extractRDF, runWrxCli } from './wrx.js';
 
 const originalFetch = globalThis.fetch;
 const originalDOMParser = (globalThis as { DOMParser?: unknown }).DOMParser;
@@ -862,5 +862,128 @@ describe('extractAllRDF', () => {
     expect(overview.found.some((r) => r.source === 'content-negotiation')).toBe(true);
     // HTML signposting should also have found RDF from the HTML fallback fetch
     expect(overview.found.some((r) => r.source === 'signposting-html-link')).toBe(true);
+  });
+});
+
+describe('runWrxCli', () => {
+  async function captureCliOutput(args: string[]): Promise<{ logs: string[]; errors: string[] }> {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const origLog = console.log;
+    const origErr = console.error;
+
+    console.log = (...parts: unknown[]) => {
+      logs.push(parts.map((p) => String(p)).join(' '));
+    };
+    console.error = (...parts: unknown[]) => {
+      errors.push(parts.map((p) => String(p)).join(' '));
+    };
+
+    try {
+      await runWrxCli(args);
+      return { logs, errors };
+    } finally {
+      console.log = origLog;
+      console.error = origErr;
+    }
+  }
+
+  test('supports --profile and --extend-links with URL in any order and emits modeled link output', async () => {
+    const URI = 'https://cli.example/resource';
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
+
+      if (url === URI) {
+        if (accept.includes('application/linkset+json')) {
+          return new Response('Not linkset', { status: 404, headers: { 'content-type': 'text/plain' } });
+        }
+        return new Response(
+          `<html><head><link rel="describedby" href="${URI}.ttl" type="text/turtle"></head><body></body></html>`,
+          {
+            status: 200,
+            headers: {
+              'content-type': 'text/html',
+              link: `<${URI}.ttl>; rel="describedby"; type="text/turtle", <${URI}.linkset>; rel="linkset"; type="application/linkset+json"`,
+            },
+          }
+        );
+      }
+
+      if (url === `${URI}.ttl`) {
+        return new Response('@prefix dcat: <http://www.w3.org/ns/dcat#> .', {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+
+      if (url === `${URI}.linkset` && accept.includes('application/linkset+json')) {
+        return new Response(
+          JSON.stringify({
+            linkset: [
+              {
+                anchor: URI,
+                describedby: [{ href: `${URI}.jsonld`, type: 'application/ld+json' }],
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/linkset+json' },
+          }
+        );
+      }
+
+      if (url === `${URI}.jsonld`) {
+        return new Response('{"@context":"https://schema.org/","@type":"Dataset"}', {
+          status: 200,
+          headers: { 'content-type': 'application/ld+json' },
+        });
+      }
+
+      if (url === 'https://cli.example/robots.txt') {
+        return new Response('User-agent: *\nDisallow: /', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        });
+      }
+
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const { logs, errors } = await captureCliOutput(['--extend-links', URI, '--profile', '--all']);
+    const output = logs.join('\n');
+
+    expect(errors).toHaveLength(0);
+    expect(output).toContain('Extended Link Relations (JSON):');
+    expect(output).toContain('Extended Link Relations (xhtml Turtle-like):');
+    expect(output).toContain('@prefix xhtml: <http://www.w3.org/1999/xhtml>.');
+    expect(output).toContain('"rel": "describedby"');
+    expect(output).toContain('TODO: profile discovery step is reserved and intentionally not implemented yet.');
+  });
+
+  test('keeps baseline single-mode output without new flags', async () => {
+    const URI = 'https://cli.example/basic';
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === URI) {
+        return new Response('@prefix ex: <https://example/> . ex:s ex:p ex:o .', {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const { logs, errors } = await captureCliOutput([URI]);
+    const output = logs.join('\n');
+
+    expect(errors).toHaveLength(0);
+    expect(output).toContain(`Extracting RDF from: ${URI}`);
+    expect(output).toContain('Found RDF (content-negotiation)');
+    expect(output).not.toContain('Extended Link Relations (JSON):');
+    expect(output).not.toContain('--profile placeholder');
   });
 });
