@@ -92,26 +92,6 @@ function fetchDescribedBy(url, declaredType) {
   return fetchWithRedirect(url, { headers: { Accept: accept } });
 }
 
-// src/core/mime.ts
-function looksLikeJsonLd(text) {
-  try {
-    const obj = JSON.parse(text);
-    const records = Array.isArray(obj) ? obj : [obj];
-    return records.some((item) => typeof item === "object" && item !== null && (("@context" in item) || ("@type" in item) || ("@graph" in item)));
-  } catch {
-    return false;
-  }
-}
-function resolveRdfFormat(responseCt, declaredType, body) {
-  const ct = (responseCt ?? "").toLowerCase().trim();
-  if (RDF_MIME_SET.has(ct))
-    return ct;
-  if (declaredType && RDF_MIME_SET.has(declaredType.toLowerCase().trim()) && ct === "application/json" && looksLikeJsonLd(body)) {
-    return declaredType;
-  }
-  return null;
-}
-
 // src/core/html-parser.ts
 function parseTagAttributes(tagText) {
   const attrs = {};
@@ -614,6 +594,26 @@ class EmbeddedScriptStrategy {
   }
 }
 var embeddedScriptStrategy = new EmbeddedScriptStrategy;
+// src/core/mime.ts
+function looksLikeJsonLd(text) {
+  try {
+    const obj = JSON.parse(text);
+    const records = Array.isArray(obj) ? obj : [obj];
+    return records.some((item) => typeof item === "object" && item !== null && (("@context" in item) || ("@type" in item) || ("@graph" in item)));
+  } catch {
+    return false;
+  }
+}
+function resolveRdfFormat(responseCt, declaredType, body) {
+  const ct = (responseCt ?? "").toLowerCase().trim();
+  if (RDF_MIME_SET.has(ct))
+    return ct;
+  if (declaredType && RDF_MIME_SET.has(declaredType.toLowerCase().trim()) && ct === "application/json" && looksLikeJsonLd(body)) {
+    return declaredType;
+  }
+  return null;
+}
+
 // src/strategies/linkset.ts
 class LinksetStrategy {
   label = "RFC 9264 Linkset";
@@ -1030,7 +1030,7 @@ class SitemapSignpostingStrategy {
 }
 var sitemapSignpostingStrategy = new SitemapSignpostingStrategy;
 // src/strategies/pipeline.ts
-async function buildStrategyContext(uri) {
+async function buildStrategyContext(uri, allowHtmlFallbackAfterInitialRdf) {
   let bodyText = "";
   let linkHeader = null;
   let initialMime = "";
@@ -1048,7 +1048,7 @@ async function buildStrategyContext(uri) {
       bodyText = "";
     }
   } catch {}
-  if (!bodyText) {
+  if (!bodyText && (!initialOk || !isRDFMime(initialMime) || allowHtmlFallbackAfterInitialRdf)) {
     const fallback = await fetchHtmlFallback(uri);
     if (fallback.body) {
       bodyText = fallback.body;
@@ -1117,7 +1117,7 @@ async function probeContentNegotiation(uri) {
   return probes;
 }
 async function discoverFirstRdf(uri) {
-  const ctx = await buildStrategyContext(uri);
+  const ctx = await buildStrategyContext(uri, false);
   if (ctx.initialOk && isRDFMime(ctx.initialMime)) {
     return {
       content: ctx.initialBody,
@@ -1143,7 +1143,7 @@ async function discoverFirstRdf(uri) {
   return sitemapSignpostingStrategy.executeFirstHit(ctx);
 }
 async function discoverAllRdf(uri) {
-  const ctx = await buildStrategyContext(uri);
+  const ctx = await buildStrategyContext(uri, true);
   const found = [];
   const notFound = [];
   const contentNegotiations = await probeContentNegotiation(uri);
