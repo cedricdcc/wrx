@@ -27,4 +27,40 @@ if (result) {
 
 When working in this repository directly, import from `./wrx.js`.
 
+### CLI
+
+Quick first-match mode:
+
+```sh
+bun run wrx.js https://example.org/dataset
+```
+
+Explore all extraction strategies:
+
+```sh
+bun run wrx.js --all https://example.org/dataset
+```
+
+Extend CLI output with modeled web-link relations (JSON + xhtml Turtle-like block):
+
+```sh
+bun run wrx.js --extend-links https://example.org/dataset
+```
+
+Enable FAIR profile discovery summary:
+
+```sh
+bun run wrx.js --profile https://example.org/dataset
+```
+
+Flags can be combined, for example:
+
+```sh
+bun run wrx.js --all --extend-links --profile https://example.org/dataset
+```
+
+`--profile` now reports discovered profile URIs from Link headers/linksets (including `profile` link-extension attributes and `rel=profile` targets).
+
+In addition to RDF extraction, the library also exports `extractLinkRelations(uri)` to harvest modeled web-link relations (e.g., `describedby`, `cite-as`, `item`, `license`, `author`) for signposting graph use cases.
+
 This package targets Bun runtime APIs.

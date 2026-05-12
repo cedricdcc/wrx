@@ -140,6 +140,148 @@ interface RDFOverview {
 
 ---
 
+## Strategy Pipeline Architecture
+
+`wrx.js` uses a **modular strategy pipeline** where each RDF discovery method is implemented as a standalone strategy class. All strategies follow a common interface (`DiscoveryStrategy`) and are orchestrated by a central pipeline.
+
+### Core Concepts
+
+#### `DiscoveryStrategy` Interface
+
+Each strategy implements two modes:
+
+```typescript
+interface DiscoveryStrategy {
+  // Single-hit mode: return first success or null
+  executeFirstHit(ctx: StrategyContext): Promise<ExtractedRDF | null>
+
+  // All-hits mode: collect all successes exhaustively
+  executeAllHits(ctx: StrategyContext): Promise<ExtractedRDF[]>
+
+  label: string;              // Human-readable name
+  source: ExtractedRDF['source'];  // Strategy identifier
+}
+```
+
+#### `StrategyContext` — Shared State
+
+All strategies receive a shared context object to avoid redundant fetches:
+
+```typescript
+interface StrategyContext {
+  uri: string;              // Resource being interrogated
+  linksetUrl?: string;      // Optional explicit linkset URL
+  bodyText: string;         // HTML body (fetched once, shared)
+  linkHeader: string | null;// HTTP Link header (parsed once)
+  htmlDoc: Document | null; // Parsed HTML (if DOMParser available)
+}
+```
+
+The pipeline **builds this context once** and passes it to all strategies in order. This means:
+- Initial fetch → read body text once → all strategies reuse it
+- HTML parsing → happen once if DOMParser available → shared across all strategies
+- Later strategies benefit from work done by earlier strategies
+
+### Built-in Strategies
+
+All strategies live in `src/strategies/`:
+
+| Strategy | Location | Source Tag | Description |
+|---|---|---|---|
+| **Content Negotiation** | `content-negotiation.ts` | `'content-negotiation'` | RFC 7231 Accept header negotiation |
+| **HTTP Link Header** | `link-header.ts` | `'signposting-link-header'` | RFC 8288 Link header & rel=describedby |
+| **Linkset** | `linkset.ts` | `'linkset'` | RFC 9264 Linkset + anchor matching + cite-as fallback |
+| **HTML Link Signposting** | `html-signposting.ts` | `'signposting-html-link'` | FAIR signposting: link[rel=describedby] in HTML |
+| **Embedded Script** | `embedded-script.ts` | `'embedded-script'` | Extracts script[type="application/ld+json"] etc |
+| **Sitemap Signposting** | `sitemap-signposting.ts` | `'sitemap-signposting'` | robots.txt → sitemap.xml → xhtml:link |
+
+### Execution Flow
+
+**`extractRDF(uri)`** — Single-hit mode:
+1. Build `StrategyContext` (fetch initial response, parse HTML if needed)
+2. Try strategies in `STRATEGY_ORDER` (see [src/core/constants.ts](src/core/constants.ts))
+3. Return first successful `ExtractedRDF` or `null`
+
+**`extractAllRDF(uri)`** — All-hits mode:
+1. Build `StrategyContext`
+2. Run **all strategies exhaustively** (even after finding RDF)
+3. Collect all results + trace metrics per strategy
+4. Return `RDFOverview` with `.found`, `.trace`, `.contentNegotiations`
+
+Both modes are orchestrated by `src/strategies/pipeline.ts`:
+```typescript
+export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null> { }
+export async function discoverAllRdf(uri: string): Promise<RDFOverview> { }
+```
+
+### Adding a New Strategy
+
+To add a custom RDF discovery strategy:
+
+1. **Create strategy class** — `src/strategies/my-strategy.ts`:
+   ```typescript
+   export class MyStrategy implements DiscoveryStrategy {
+     readonly label = 'My Custom Strategy'
+     readonly source: ExtractedRDF['source'] = 'my-strategy' // Update type
+
+     async executeFirstHit(ctx: StrategyContext): Promise<ExtractedRDF | null> {
+       // Return first RDF match or null
+     }
+
+     async executeAllHits(ctx: StrategyContext): Promise<ExtractedRDF[]> {
+       // Return all RDF matches
+     }
+   }
+   ```
+
+2. **Add strategy label** — Update [src/core/types.ts](src/core/types.ts) `ExtractedRDF['source']` union type to include your strategy source name.
+
+3. **Register in pipeline** — Add to `STRATEGY_ORDER` in [src/core/constants.ts](src/core/constants.ts).
+
+4. **Write unit tests** — Create `src/strategies/my-strategy.test.ts` following the patterns in existing test files. Mock `fetch` and `DOMParser` as needed.
+
+5. **Run tests**:
+   ```bash
+   bun test
+   ```
+
+### Testing Individual Strategies
+
+Each strategy has dedicated unit tests in `src/strategies/*.test.ts`. Common patterns:
+
+- **Mock fetch** for HTTP responses
+- **Test both modes** (`executeFirstHit` + `executeAllHits`)
+- **Test edge cases**: missing headers, parsing failures, relative URL resolution
+- **Verify deduplication** in all-hits mode
+
+Example test pattern:
+```typescript
+test('executeFirstHit returns RDF from describedby link', async () => {
+  globalThis.fetch = (async (url) => {
+    if (url === 'https://example.com/metadata.ttl') {
+      return new Response(rdfBody, {
+        status: 200,
+        headers: { 'content-type': 'text/turtle' },
+      })
+    }
+    return new Response('Not found', { status: 404 })
+  })
+
+  const ctx: StrategyContext = {
+    uri: 'https://example.com/resource',
+    bodyText: '<html>...</html>',
+    linkHeader: '<https://example.com/metadata.ttl>; rel="describedby"',
+    htmlDoc: null,
+  }
+
+  const result = await strategy.executeFirstHit(ctx)
+  expect(result).not.toBeNull()
+  expect(result?.source).toBe('signposting-link-header')
+})
+```
+
+---
+
 ## Extraction Strategy — Full Flowchart
 
 The diagram below captures every decision branch inside `extractRDF()`.
@@ -449,6 +591,27 @@ Example output:
 
 > **Note:** `text/n3` returned `text/turtle` in the example above, which is the same format as the first request. The `found` array deduplicates by response format, so both requests count in `contentNegotiations` but only one entry appears in `found`.
 
+### CLI flags: `--extend-links` and `--profile`
+
+`wrx` supports additional CLI flags for post-harvest behavior:
+
+- `--extend-links`: prints modeled web-link relations discovered during harvesting as:
+  - JSON summary
+  - Turtle-like `xhtml:link` statements
+- `--profile`: prints discovered FAIR profile URIs collected from signposting links (`profile` link-extension attributes and `rel=profile` targets).
+
+Examples:
+
+```sh
+# Add modeled relation output in first-match mode
+bun run wrx.js --extend-links https://example.org/dataset
+
+# Full strategy overview + extended relations + profile summary
+bun run wrx.js --all --extend-links --profile https://example.org/dataset
+```
+
+The `--extend-links` relation model focuses on web links discovered in harvesting flows (HTTP Link headers, HTML `<link>` hints, and linkset entries), not RDF graph parsing.
+
 ### As a library — `extractAllRDF`
 
 ```typescript
@@ -511,3 +674,9 @@ When a linkset entry's `describedby`/`profile` targets all fail to return RDF, t
 
 ### Trailing-slash normalisation
 URI comparison in the sitemap strategy accepts `https://example.org/foo`, `https://example.org/foo/` and their reverse without requiring exact equality. The same `normUri()` helper is used for anchor matching in the linkset strategy.
+
+### HEAD-first signposting preflight
+`extractRDF()` now runs a lightweight HTTP `HEAD` preflight before body-based content negotiation. If FAIR signposting links in headers already resolve to RDF (`rel=describedby`/`rel=profile` and linkset references), extraction can complete without fetching the primary resource body.
+
+### Sitemap/Signmap namespace configuration
+Sitemap fallback parses both XHTML link elements and ResourceSync Signmap links (`rs:ln` in `http://www.openarchives.org/rs/terms/`) via a namespace configuration list in the sitemap strategy, so additional namespaces can be added/edited/removed in one place.
