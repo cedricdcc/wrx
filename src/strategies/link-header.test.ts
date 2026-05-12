@@ -135,6 +135,38 @@ describe('LinkHeaderStrategy', () => {
     expect(result?.url).toBe(PROFILE);
   });
 
+  test('executeFirstHit allows describedby links with non-RDF MIME when profile is declared', async () => {
+    const RESOURCE = 'https://example.com/resource';
+    const METADATA = 'https://example.com/metadata.xml';
+    const RDF_BODY = '<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"></rdf:RDF>';
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === METADATA) {
+        return new Response(RDF_BODY, {
+          status: 200,
+          headers: { 'content-type': 'application/rdf+xml' },
+        });
+      }
+
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const ctx: StrategyContext = {
+      uri: RESOURCE,
+      bodyText: '',
+      linkHeader: `<${METADATA}>; rel="describedby"; type="application/xml"; profile="https://example.com/profile/rdfxml"`,
+      htmlDoc: null,
+    };
+
+    const result = await strategy.executeFirstHit(ctx);
+
+    expect(result).not.toBeNull();
+    expect(result?.format).toBe('application/rdf+xml');
+    expect(result?.url).toBe(METADATA);
+  });
+
   test('executeAllHits collects all successful describedby links', async () => {
     const RESOURCE = 'https://example.com/resource';
     const METADATA1 = 'https://example.com/metadata1.ttl';

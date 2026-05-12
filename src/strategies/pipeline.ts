@@ -1,6 +1,6 @@
 import { ExtractedRDF, RDF_MIME_SET } from '../core/types'
 import { STRATEGY_ORDER, RDF_MIMES } from '../core/constants'
-import { fetchWithRedirect, fetchHtmlFallback, fetchRDF } from '../core/fetch'
+import { fetchWithRedirect, fetchHeadLinkHeader, fetchHtmlFallback, fetchRDF } from '../core/fetch'
 import { baseMime, isRDFMime, normUri } from '../core/utils'
 import { extractHtmlHints } from '../core/html-parser'
 import { parseLinkHeader } from '../core/link-parser'
@@ -39,6 +39,28 @@ export interface DiscoveryOverview {
   notFound: Array<ExtractedRDF['source']>
   contentNegotiations: ContentNegotiationProbe[]
   trace: StrategyTraceStep[]
+}
+
+async function runHeadSignpostingPreflight(uri: string): Promise<ExtractedRDF | null> {
+  const linkHeader = await fetchHeadLinkHeader(uri)
+  if (!linkHeader) return null
+
+  const headCtx: StrategyContext = {
+    uri,
+    bodyText: '',
+    linkHeader,
+    htmlDoc: null,
+  }
+
+  const headerHit = await linkHeaderStrategy.executeFirstHit(headCtx)
+  if (headerHit) return headerHit
+
+  for (const linksetUrl of collectLinksetCandidates(uri, '', linkHeader)) {
+    const linksetHit = await linksetStrategy.executeFirstHit({ ...headCtx, linksetUrl })
+    if (linksetHit) return linksetHit
+  }
+
+  return null
 }
 
 async function buildStrategyContext(uri: string, allowHtmlFallbackAfterInitialRdf: boolean): Promise<StrategyContext> {
@@ -148,6 +170,9 @@ async function probeContentNegotiation(uri: string): Promise<ContentNegotiationP
 }
 
 export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null> {
+  const headPreflightHit = await runHeadSignpostingPreflight(uri)
+  if (headPreflightHit) return headPreflightHit
+
   const ctx = await buildStrategyContext(uri, false)
 
   if (ctx.initialOk && isRDFMime(ctx.initialMime)) {

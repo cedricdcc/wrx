@@ -176,6 +176,27 @@ export async function extractRDF(uri: string): Promise<ExtractedRDF | null> {
   return discoverFirstRdf(uri)
 }
 
+export async function extractLinkRelations(uri: string): Promise<LinkRelationObservation[]> {
+  return collectLinkRelationsForUri(uri)
+}
+
+function collectProfileValues(relations: LinkRelationObservation[]): string[] {
+  const profiles = new Set<string>()
+  for (const relation of relations) {
+    if (relation.rel === 'profile') {
+      profiles.add(relation.href)
+    }
+    for (const option of relation.options) {
+      const optionName = (option.name ?? '').toLowerCase()
+      const optionValue = (option.value ?? '').trim()
+      if (optionName === 'profile' && optionValue) {
+        profiles.add(optionValue)
+      }
+    }
+  }
+  return [...profiles]
+}
+
 export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise<void> {
   let parsed: ParsedCliArgs
   try {
@@ -196,11 +217,8 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
     return
   }
 
-  let harvestedOverview: Awaited<ReturnType<typeof extractAllRDF>> | null = null
-
   if (allMode) {
-    harvestedOverview = await extractAllRDF(url)
-    const overview = harvestedOverview
+    const overview = await extractAllRDF(url)
 
     console.log(`🔍 Extracting RDF from: ${url}`)
     console.log('')
@@ -278,10 +296,16 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
   }
 
   if (profileMode) {
-    const harvestCount = harvestedOverview ? harvestedOverview.found.length : 0
+    const relations = await collectLinkRelationsForUri(url)
+    const profiles = collectProfileValues(relations)
+
     console.log('')
-    console.log(`🧪 --profile placeholder: harvested ${harvestCount} RDF source(s).`)
-    console.log('TODO: profile discovery step is reserved and intentionally not implemented yet.')
+    console.log(`🧪 Profiles discovered: ${profiles.length}`)
+    if (profiles.length > 0) {
+      for (const profile of profiles) {
+        console.log(`   - ${profile}`)
+      }
+    }
   }
 }
 

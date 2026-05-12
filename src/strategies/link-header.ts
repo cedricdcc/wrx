@@ -3,6 +3,18 @@ import { StrategyContext, DiscoveryStrategy } from './strategy-interface'
 import { parseLinkHeader } from '../core/link-parser'
 import { fetchRDF } from '../core/fetch'
 import { baseMime, isRDFMime, normUri, isLinksetMime } from '../core/utils'
+import { resolveRdfFormat } from '../core/mime'
+
+function hasDeclaredProfile(link: { [key: string]: string }): boolean {
+  return Boolean((link['profile'] ?? '').trim())
+}
+
+function shouldTryDescribedBy(link: { [key: string]: string }): boolean {
+  const declaredType = (link['type'] ?? '').trim()
+  if (!declaredType) return true
+  if (isRDFMime(declaredType)) return true
+  return hasDeclaredProfile(link)
+}
 
 /**
  * HTTP Link Header Signposting Strategy (RFC 8288, RFC 9264)
@@ -33,13 +45,13 @@ export class LinkHeaderStrategy implements DiscoveryStrategy {
 
     // Filter for describedby links (may have type constraint)
     const describedByLinks = links.filter(
-      (l) => l['rel'] === 'describedby' && (!l['type'] || isRDFMime(l['type']))
+      (l) => l['rel'] === 'describedby' && shouldTryDescribedBy(l)
     )
 
     // Also collect rel=profile with RDF MIME type as describedby equivalents
     const profileLinks = links.filter((l) => l['rel'] === 'profile')
     const profileDescribedBy = profileLinks.filter(
-      (pl) => !pl['type'] || isRDFMime(pl['type'])
+      (pl) => shouldTryDescribedBy(pl)
     )
 
     // Try all describedby sources (profile + direct describedby) in order
@@ -53,11 +65,13 @@ export class LinkHeaderStrategy implements DiscoveryStrategy {
         const metaUrl = new URL(url, ctx.uri).toString()
         const res = await fetchRDF(metaUrl)
         const ct = baseMime(res.headers.get('content-type'))
+        const body = await res.text()
+        const format = resolveRdfFormat(ct, link['type'], body)
 
-        if (isRDFMime(ct) && res.ok) {
+        if (format && res.ok) {
           return {
-            content: await res.text(),
-            format: ct,
+            content: body,
+            format,
             source: this.source,
             url: metaUrl,
           }
@@ -84,13 +98,13 @@ export class LinkHeaderStrategy implements DiscoveryStrategy {
 
     // Filter for describedby links (may have type constraint)
     const describedByLinks = links.filter(
-      (l) => l['rel'] === 'describedby' && (!l['type'] || isRDFMime(l['type']))
+      (l) => l['rel'] === 'describedby' && shouldTryDescribedBy(l)
     )
 
     // Also collect rel=profile with RDF MIME type as describedby equivalents
     const profileLinks = links.filter((l) => l['rel'] === 'profile')
     const profileDescribedBy = profileLinks.filter(
-      (pl) => !pl['type'] || isRDFMime(pl['type'])
+      (pl) => shouldTryDescribedBy(pl)
     )
 
     // Try all describedby sources (profile + direct describedby)
@@ -110,11 +124,13 @@ export class LinkHeaderStrategy implements DiscoveryStrategy {
 
         const res = await fetchRDF(metaUrl)
         const ct = baseMime(res.headers.get('content-type'))
+        const body = await res.text()
+        const format = resolveRdfFormat(ct, link['type'], body)
 
-        if (isRDFMime(ct) && res.ok) {
+        if (format && res.ok) {
           found.push({
-            content: await res.text(),
-            format: ct,
+            content: body,
+            format,
             source: this.source,
             url: metaUrl,
           })

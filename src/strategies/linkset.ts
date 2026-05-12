@@ -5,6 +5,17 @@ import { baseMime, normUri, isRDFMime, isLinksetMime } from '../core/utils'
 import { resolveRdfFormat } from '../core/mime'
 import { parseLinkHeader } from '../core/link-parser'
 
+function hasDeclaredProfile(target: { profile?: string } | { [key: string]: string }): boolean {
+  const raw = target['profile']
+  return typeof raw === 'string' && raw.trim().length > 0
+}
+
+function shouldTryDeclaredType(type: string | undefined, hasProfile: boolean): boolean {
+  if (!type) return true
+  if (isRDFMime(type)) return true
+  return hasProfile
+}
+
 /**
  * Linkset Strategy (RFC 9264)
  *
@@ -103,7 +114,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
           for (const target of targets) {
             if (!target.href) continue
             // Skip if declared type is clearly not RDF
-            if (target.type && !isRDFMime(target.type)) continue
+            if (!shouldTryDeclaredType(target.type, hasDeclaredProfile(target))) continue
 
             const metaUrl = new URL(target.href, linksetUrl).toString()
             try {
@@ -165,7 +176,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
 
         if ((link['rel'] === 'describedby' || link['rel'] === 'profile') && link['url']) {
           const declaredType = link['type']
-          if (declaredType && !isRDFMime(declaredType)) continue
+          if (!shouldTryDeclaredType(declaredType, hasDeclaredProfile(link))) continue
 
           const metaUrl = new URL(link['url'], linksetUrl).toString()
           try {
@@ -238,7 +249,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
 
           for (const target of targets) {
             if (!target.href) continue
-            if (target.type && !isRDFMime(target.type)) continue
+            if (!shouldTryDeclaredType(target.type, hasDeclaredProfile(target))) continue
 
             const metaUrl = new URL(target.href, linksetUrl).toString()
             try {
@@ -298,7 +309,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
 
         if ((link['rel'] === 'describedby' || link['rel'] === 'profile') && link['url']) {
           const declaredType = link['type']
-          if (declaredType && !isRDFMime(declaredType)) continue
+          if (!shouldTryDeclaredType(declaredType, hasDeclaredProfile(link))) continue
 
           const metaUrl = new URL(link['url'], linksetUrl).toString()
           try {

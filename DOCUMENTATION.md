@@ -598,7 +598,7 @@ Example output:
 - `--extend-links`: prints modeled web-link relations discovered during harvesting as:
   - JSON summary
   - Turtle-like `xhtml:link` statements
-- `--profile`: runs an additional post-harvest placeholder step and prints a TODO message (profile extraction logic intentionally not implemented yet).
+- `--profile`: prints discovered FAIR profile URIs collected from signposting links (`profile` link-extension attributes and `rel=profile` targets).
 
 Examples:
 
@@ -606,7 +606,7 @@ Examples:
 # Add modeled relation output in first-match mode
 bun run wrx.js --extend-links https://example.org/dataset
 
-# Full strategy overview + extended relations + profile placeholder
+# Full strategy overview + extended relations + profile summary
 bun run wrx.js --all --extend-links --profile https://example.org/dataset
 ```
 
@@ -674,3 +674,9 @@ When a linkset entry's `describedby`/`profile` targets all fail to return RDF, t
 
 ### Trailing-slash normalisation
 URI comparison in the sitemap strategy accepts `https://example.org/foo`, `https://example.org/foo/` and their reverse without requiring exact equality. The same `normUri()` helper is used for anchor matching in the linkset strategy.
+
+### HEAD-first signposting preflight
+`extractRDF()` now runs a lightweight HTTP `HEAD` preflight before body-based content negotiation. If FAIR signposting links in headers already resolve to RDF (`rel=describedby`/`rel=profile` and linkset references), extraction can complete without fetching the primary resource body.
+
+### Sitemap/Signmap namespace configuration
+Sitemap fallback parses both XHTML link elements and ResourceSync Signmap links (`rs:ln` in `http://www.openarchives.org/rs/terms/`) via a namespace configuration list in the sitemap strategy, so additional namespaces can be added/edited/removed in one place.

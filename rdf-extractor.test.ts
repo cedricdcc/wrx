@@ -33,12 +33,18 @@ describe('extractRDF', () => {
   test('extracts RDF from HTML describedby when DOMParser is unavailable', async () => {
     delete (globalThis as { DOMParser?: unknown }).DOMParser;
 
-    let callCount = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
-      callCount += 1;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      const method = init?.method ?? 'GET';
 
-      if (callCount === 1) {
+      if (url === 'https://data.example/' && method === 'HEAD') {
+        return new Response('', {
+          status: 200,
+          headers: {},
+        });
+      }
+
+      if (url === 'https://data.example/') {
         expect(url).toBe('https://data.example/');
         return new Response(
           '<html><head><link href="./metadata.ttl" rel="describedby" type="text/turtle"></head><body></body></html>',
@@ -49,10 +55,16 @@ describe('extractRDF', () => {
         );
       }
 
-      expect(url).toBe('https://data.example/metadata.ttl');
-      return new Response('@prefix dcat: <http://www.w3.org/ns/dcat#> .', {
-        status: 200,
-        headers: { 'content-type': 'text/turtle; charset=utf-8' },
+      if (url === 'https://data.example/metadata.ttl') {
+        return new Response('@prefix dcat: <http://www.w3.org/ns/dcat#> .', {
+          status: 200,
+          headers: { 'content-type': 'text/turtle; charset=utf-8' },
+        });
+      }
+
+      return new Response('Not found', {
+        status: 404,
+        headers: { 'content-type': 'text/plain' },
       });
     }) as typeof fetch;
 
@@ -115,6 +127,45 @@ describe('extractRDF', () => {
     expect(result?.source).toBe('content-negotiation');
     expect(result?.format).toBe('application/trig');
     expect(result?.content).toBe(TRIG_BODY);
+  });
+
+  test('prefers HEAD signposting preflight before GET content negotiation', async () => {
+    const URI = 'https://head.example/resource';
+    const METADATA = 'https://head.example/metadata.ttl';
+    const RDF_BODY = '@prefix : <http://example.com/> . :s :p :o .';
+    const methods: string[] = [];
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      methods.push(`${method}:${url}`);
+
+      if (url === URI && method === 'HEAD') {
+        return new Response('', {
+          status: 200,
+          headers: {
+            link: `<${METADATA}>; rel="describedby"; type="text/turtle"`,
+          },
+        });
+      }
+
+      if (url === METADATA) {
+        return new Response(RDF_BODY, {
+          status: 200,
+          headers: { 'content-type': 'text/turtle' },
+        });
+      }
+
+      return new Response('Not found', { status: 404 });
+    }) as typeof fetch;
+
+    const result = await extractRDF(URI);
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('signposting-link-header');
+    expect(result?.url).toBe(METADATA);
+    expect(methods).toContain(`HEAD:${URI}`);
+    expect(methods).not.toContain(`GET:${URI}`);
   });
 
   // InvenioRDM / Zenodo-style signposting:
@@ -716,13 +767,12 @@ describe('extractRDF', () => {
 
     const URI = 'https://data.example/throws-on-rdf-accept';
     const JSONLD_BODY = JSON.stringify({ '@context': 'https://schema.org/', '@type': 'Dataset' });
-    let callCount = 0;
-
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      callCount += 1;
+      const method = init?.method ?? 'GET';
+      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
 
-      if (url === URI && callCount === 1) {
+      if (url === URI && method === 'GET' && accept.includes('application/rdf+xml')) {
         // First fetch (RDF content negotiation) — simulate network error
         throw new TypeError('Failed to fetch');
       }
@@ -888,8 +938,9 @@ describe('runWrxCli', () => {
     }
   }
 
-  test('supports --profile and --extend-links with URL in any order and emits modeled link output', async () => {
+  test('supports --profile and --extend-links with URL in any order and emits modeled link + profile output', async () => {
     const URI = 'https://cli.example/resource';
+    const PROFILE_URI = 'https://w3id.org/ro/crate/1.1';
 
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -905,7 +956,7 @@ describe('runWrxCli', () => {
             status: 200,
             headers: {
               'content-type': 'text/html',
-              link: `<${URI}.ttl>; rel="describedby"; type="text/turtle", <${URI}.linkset>; rel="linkset"; type="application/linkset+json"`,
+              link: `<${URI}.ttl>; rel="describedby"; type="text/turtle"; profile="${PROFILE_URI}", <${URI}.linkset>; rel="linkset"; type="application/linkset+json"`,
             },
           }
         );
@@ -960,7 +1011,8 @@ describe('runWrxCli', () => {
     expect(output).toContain('Extended Link Relations (xhtml Turtle-like):');
     expect(output).toContain('@prefix xhtml: <http://www.w3.org/1999/xhtml>.');
     expect(output).toContain('"rel": "describedby"');
-    expect(output).toContain('TODO: profile discovery step is reserved and intentionally not implemented yet.');
+    expect(output).toContain('Profiles discovered: 1');
+    expect(output).toContain(`- ${PROFILE_URI}`);
   });
 
   test('keeps baseline single-mode output without new flags', async () => {
@@ -984,6 +1036,6 @@ describe('runWrxCli', () => {
     expect(output).toContain(`Extracting RDF from: ${URI}`);
     expect(output).toContain('Found RDF (content-negotiation)');
     expect(output).not.toContain('Extended Link Relations (JSON):');
-    expect(output).not.toContain('--profile placeholder');
+    expect(output).not.toContain('Profiles discovered:');
   });
 });

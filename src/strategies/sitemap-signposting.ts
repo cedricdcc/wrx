@@ -1,7 +1,116 @@
 import { ExtractedRDF } from '../core/types'
 import { StrategyContext, DiscoveryStrategy } from './strategy-interface'
 import { fetchWithRedirect, fetchRDF } from '../core/fetch'
-import { baseMime, isRDFMime } from '../core/utils'
+import { baseMime, isRDFMime, splitRelValues } from '../core/utils'
+import { resolveRdfFormat } from '../core/mime'
+import { parseTagAttributes } from '../core/html-parser'
+
+interface SitemapLinkNamespace {
+  namespaceUri: string
+  localName: string
+}
+
+const SITEMAP_LINK_NAMESPACES: SitemapLinkNamespace[] = [
+  { namespaceUri: 'http://www.w3.org/1999/xhtml', localName: 'link' },
+  { namespaceUri: 'http://www.openarchives.org/rs/terms/', localName: 'ln' },
+]
+const SITEMAP_NS = 'http://www.sitemaps.org/schemas/sitemap/0.9'
+
+function shouldTryDeclaredType(type: string | null, hasProfile: boolean): boolean {
+  const declaredType = (type ?? '').trim()
+  if (!declaredType) return true
+  if (isRDFMime(declaredType)) return true
+  return hasProfile
+}
+
+function collectConfiguredLinkElements(urlEl: Element): Element[] {
+  const found: Element[] = []
+  const seen = new Set<Element>()
+
+  for (const { namespaceUri, localName } of SITEMAP_LINK_NAMESPACES) {
+    for (const el of urlEl.getElementsByTagNameNS(namespaceUri, localName)) {
+      if (!seen.has(el)) {
+        seen.add(el)
+        found.push(el)
+      }
+    }
+  }
+
+  return found
+}
+
+function collectSitemapUrlElements(xmlDoc: Document): Element[] {
+  const found: Element[] = []
+  const seen = new Set<Element>()
+
+  for (const urlEl of xmlDoc.getElementsByTagName('url')) {
+    if (!seen.has(urlEl)) {
+      seen.add(urlEl)
+      found.push(urlEl)
+    }
+  }
+
+  for (const urlEl of xmlDoc.getElementsByTagNameNS(SITEMAP_NS, 'url')) {
+    if (!seen.has(urlEl)) {
+      seen.add(urlEl)
+      found.push(urlEl)
+    }
+  }
+
+  return found
+}
+
+function getLocElement(urlEl: Element): Element | null {
+  const plain = urlEl.getElementsByTagName('loc')[0]
+  if (plain) return plain
+
+  const namespaced = urlEl.getElementsByTagNameNS(SITEMAP_NS, 'loc')[0]
+  return namespaced ?? null
+}
+
+interface SitemapEntryLink {
+  rel: string | null
+  type: string | null
+  href: string | null
+  profile: string | null
+}
+
+interface SitemapEntry {
+  loc: string
+  links: SitemapEntryLink[]
+}
+
+function parseSitemapEntriesFallback(xmlText: string): SitemapEntry[] {
+  const entries: SitemapEntry[] = []
+  const urlBlocks = xmlText.match(/<url\b[\s\S]*?<\/url>/gi) ?? []
+  const localNames = SITEMAP_LINK_NAMESPACES.map((cfg) => cfg.localName.toLowerCase())
+
+  for (const block of urlBlocks) {
+    const locMatch = block.match(/<loc\b[^>]*>([\s\S]*?)<\/loc>/i)
+    const loc = (locMatch?.[1] ?? '').trim()
+    if (!loc) continue
+
+    const links: SitemapEntryLink[] = []
+    const linkTags = block.match(/<([a-zA-Z_][\w.-]*:)?([a-zA-Z_][\w.-]*)\b[^>]*\/?>/g) ?? []
+    for (const tagText of linkTags) {
+      const localNameMatch = tagText.match(/^<([a-zA-Z_][\w.-]*:)?([a-zA-Z_][\w.-]*)/i)
+      const localName = (localNameMatch?.[2] ?? '').toLowerCase()
+      if (!localNames.includes(localName)) continue
+
+      const attrs = parseTagAttributes(tagText)
+      links.push({
+        rel: attrs['rel'] ?? null,
+        type: attrs['type'] ?? null,
+        href: attrs['href'] ?? null,
+        profile: attrs['profile'] ?? null,
+      })
+    }
+
+    entries.push({ loc, links })
+  }
+
+  return entries
+}
 
 /**
  * Sitemap Signposting Strategy
@@ -82,38 +191,52 @@ export class SitemapSignpostingStrategy implements DiscoveryStrategy {
         continue
       }
 
-      // Parse sitemap XML
-      let xmlDoc: Document
-      try {
-        xmlDoc = new DOMParser().parseFromString(sText, 'text/xml')
-        // Check for XML parse errors
-        if (xmlDoc.getElementsByTagName('parsererror').length > 0) continue
-      } catch {
-        continue
+      const entries: SitemapEntry[] = []
+
+      if (typeof DOMParser !== 'undefined') {
+        try {
+          const xmlDoc = new DOMParser().parseFromString(sText, 'text/xml')
+          if (xmlDoc.getElementsByTagName('parsererror').length > 0) continue
+
+          const urlElements = collectSitemapUrlElements(xmlDoc)
+          for (const urlEl of urlElements) {
+            const locEl = getLocElement(urlEl)
+            const loc = locEl?.textContent?.trim()
+            if (!loc) continue
+
+            const links = collectConfiguredLinkElements(urlEl).map((element) => ({
+              rel: element.getAttribute('rel'),
+              type: element.getAttribute('type'),
+              href: element.getAttribute('href'),
+              profile: element.getAttribute('profile'),
+            }))
+
+            entries.push({ loc, links })
+          }
+        } catch {
+          continue
+        }
+      } else {
+        entries.push(...parseSitemapEntriesFallback(sText))
       }
 
-      // Find URL entries matching the requested URI
-      const urlElements = xmlDoc.getElementsByTagName('url')
-      for (const urlEl of urlElements) {
-        const locEl = urlEl.getElementsByTagName('loc')[0]
-        if (!locEl) continue
-
-        const loc = locEl.textContent?.trim()
+      for (const entry of entries) {
+        const loc = entry.loc
         // Loose matching (handles trailing slash differences)
         if (loc !== uri && loc !== `${uri}/` && uri !== `${loc}/`) continue
 
-        // Found matching entry. Look for xhtml:link rel=describedby
-        const xhtmlNs = 'http://www.w3.org/1999/xhtml'
-        const xLinks = urlEl.getElementsByTagNameNS(xhtmlNs, 'link')
+        // Found matching entry. Look for FAIR signposting links in configured namespaces.
+        const signpostingLinks = entry.links
 
-        for (const xLink of xLinks) {
-          const rel = xLink.getAttribute('rel')
-          const type = xLink.getAttribute('type')
-          const href = xLink.getAttribute('href')
+        for (const signpostingLink of signpostingLinks) {
+          const relValues = splitRelValues(signpostingLink.rel).map((value) => value.toLowerCase())
+          const type = signpostingLink.type
+          const href = signpostingLink.href
 
-          // Must be rel=describedby with RDF type (or no type)
-          if (rel !== 'describedby' || !href) continue
-          if (type && !isRDFMime(type)) continue
+          // Accept rel=describedby and rel=profile.
+          if (!href) continue
+          if (!relValues.includes('describedby') && !relValues.includes('profile')) continue
+          if (!shouldTryDeclaredType(type, Boolean((signpostingLink.profile ?? '').trim()))) continue
 
           // Resolve relative URL against sitemap URL
           const metaUrl = new URL(href, sitemapUrl).toString()
@@ -121,11 +244,13 @@ export class SitemapSignpostingStrategy implements DiscoveryStrategy {
           try {
             const metaRes = await fetchRDF(metaUrl)
             const metaCt = baseMime(metaRes.headers.get('content-type'))
+            const body = await metaRes.text()
+            const format = resolveRdfFormat(metaCt, type ?? undefined, body)
 
-            if (isRDFMime(metaCt) && metaRes.ok) {
+            if (format && metaRes.ok) {
               const rdf: ExtractedRDF = {
-                content: await metaRes.text(),
-                format: metaCt,
+                content: body,
+                format,
                 source: this.source,
                 url: metaUrl,
               }

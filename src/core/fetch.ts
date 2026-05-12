@@ -9,6 +9,18 @@ function fetchRDF(url: string): Promise<Response> {
   return fetchWithRedirect(url, { headers: { Accept: RDF_ACCEPT } });
 }
 
+async function fetchHeadLinkHeader(url: string): Promise<string | null> {
+  try {
+    const res = await fetchWithRedirect(url, {
+      method: 'HEAD',
+      headers: { Accept: RDF_ACCEPT },
+    });
+    return res.headers.get('link');
+  } catch {
+    return null;
+  }
+}
+
 async function fetchHtmlFallback(uri: string): Promise<{ body: string; linkHeader: string | null }> {
   try {
     const res = await fetchWithRedirect(uri, {
@@ -47,4 +59,4 @@ function fetchDescribedBy(url: string, declaredType?: string): Promise<Response>
   return fetchWithRedirect(url, { headers: { Accept: accept } });
 }
 
-export { fetchWithRedirect, fetchRDF, fetchHtmlFallback, fetchDescribedBy };
+export { fetchWithRedirect, fetchRDF, fetchHeadLinkHeader, fetchHtmlFallback, fetchDescribedBy };
