@@ -641,19 +641,20 @@ class EmbeddedScriptStrategy {
   }
 }
 var embeddedScriptStrategy = new EmbeddedScriptStrategy;
-// src/strategies/linkset.ts
-function hasDeclaredProfile2(target) {
-  const raw = target["profile"];
-  return typeof raw === "string" && raw.trim().length > 0;
+// src/core/signposting.ts
+function hasNonEmptyProfileAttribute(profile) {
+  return Boolean((profile ?? "").trim());
 }
-function shouldTryDeclaredType(type, hasProfile) {
-  if (!type)
+function shouldAcceptDeclaredType(type, hasProfile) {
+  const declaredType = (type ?? "").trim();
+  if (!declaredType)
     return true;
-  if (isRDFMime(type))
+  if (isRDFMime(declaredType))
     return true;
   return hasProfile;
 }
 
+// src/strategies/linkset.ts
 class LinksetStrategy {
   label = "RFC 9264 Linkset";
   source = "linkset";
@@ -705,7 +706,7 @@ class LinksetStrategy {
           for (const target of targets) {
             if (!target.href)
               continue;
-            if (!shouldTryDeclaredType(target.type, hasDeclaredProfile2(target)))
+            if (!shouldAcceptDeclaredType(target.type, hasNonEmptyProfileAttribute(target.profile)))
               continue;
             const metaUrl = new URL(target.href, linksetUrl).toString();
             try {
@@ -752,7 +753,7 @@ class LinksetStrategy {
           continue;
         if ((link["rel"] === "describedby" || link["rel"] === "profile") && link["url"]) {
           const declaredType = link["type"];
-          if (!shouldTryDeclaredType(declaredType, hasDeclaredProfile2(link)))
+          if (!shouldAcceptDeclaredType(declaredType, hasNonEmptyProfileAttribute(link["profile"])))
             continue;
           const metaUrl = new URL(link["url"], linksetUrl).toString();
           try {
@@ -806,7 +807,7 @@ class LinksetStrategy {
           for (const target of targets) {
             if (!target.href)
               continue;
-            if (!shouldTryDeclaredType(target.type, hasDeclaredProfile2(target)))
+            if (!shouldAcceptDeclaredType(target.type, hasNonEmptyProfileAttribute(target.profile)))
               continue;
             const metaUrl = new URL(target.href, linksetUrl).toString();
             try {
@@ -853,7 +854,7 @@ class LinksetStrategy {
           continue;
         if ((link["rel"] === "describedby" || link["rel"] === "profile") && link["url"]) {
           const declaredType = link["type"];
-          if (!shouldTryDeclaredType(declaredType, hasDeclaredProfile2(link)))
+          if (!shouldAcceptDeclaredType(declaredType, hasNonEmptyProfileAttribute(link["profile"])))
             continue;
           const metaUrl = new URL(link["url"], linksetUrl).toString();
           try {
@@ -977,14 +978,6 @@ var SITEMAP_LINK_NAMESPACES = [
   { namespaceUri: "http://www.openarchives.org/rs/terms/", localName: "ln" }
 ];
 var SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9";
-function shouldTryDeclaredType2(type, hasProfile) {
-  const declaredType = (type ?? "").trim();
-  if (!declaredType)
-    return true;
-  if (isRDFMime(declaredType))
-    return true;
-  return hasProfile;
-}
 function collectConfiguredLinkElements(urlEl) {
   const found = [];
   const seen = new Set;
@@ -1137,7 +1130,7 @@ class SitemapSignpostingStrategy {
             continue;
           if (!relValues.includes("describedby") && !relValues.includes("profile"))
             continue;
-          if (!shouldTryDeclaredType2(type, Boolean((signpostingLink.profile ?? "").trim())))
+          if (!shouldAcceptDeclaredType(type, hasNonEmptyProfileAttribute(signpostingLink.profile)))
             continue;
           const metaUrl = new URL(href, sitemapUrl).toString();
           try {

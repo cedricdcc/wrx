@@ -1,9 +1,10 @@
 import { ExtractedRDF } from '../core/types'
 import { StrategyContext, DiscoveryStrategy } from './strategy-interface'
 import { fetchWithRedirect, fetchRDF } from '../core/fetch'
-import { baseMime, isRDFMime, splitRelValues } from '../core/utils'
+import { baseMime, splitRelValues } from '../core/utils'
 import { resolveRdfFormat } from '../core/mime'
 import { parseTagAttributes } from '../core/html-parser'
+import { hasNonEmptyProfileAttribute, shouldAcceptDeclaredType } from '../core/signposting'
 
 interface SitemapLinkNamespace {
   namespaceUri: string
@@ -15,13 +16,6 @@ const SITEMAP_LINK_NAMESPACES: SitemapLinkNamespace[] = [
   { namespaceUri: 'http://www.openarchives.org/rs/terms/', localName: 'ln' },
 ]
 const SITEMAP_NS = 'http://www.sitemaps.org/schemas/sitemap/0.9'
-
-function shouldTryDeclaredType(type: string | null, hasProfile: boolean): boolean {
-  const declaredType = (type ?? '').trim()
-  if (!declaredType) return true
-  if (isRDFMime(declaredType)) return true
-  return hasProfile
-}
 
 function collectConfiguredLinkElements(urlEl: Element): Element[] {
   const found: Element[] = []
@@ -80,6 +74,14 @@ interface SitemapEntry {
   links: SitemapEntryLink[]
 }
 
+/**
+ * Lightweight XML fallback parser used when DOMParser is unavailable.
+ * This supports sitemap/signmap harvesting in runtimes without browser DOM APIs.
+ * It is intentionally conservative and expects simple sitemap structures:
+ * - `<url>...</url>` blocks are not expected to be nested or malformed.
+ * - Link tags are expected to be ordinary XML tags without `>` inside attribute values.
+ * If richer XML features are required, prefer the DOMParser path.
+ */
 function parseSitemapEntriesFallback(xmlText: string): SitemapEntry[] {
   const entries: SitemapEntry[] = []
   const urlBlocks = xmlText.match(/<url\b[\s\S]*?<\/url>/gi) ?? []
@@ -236,7 +238,7 @@ export class SitemapSignpostingStrategy implements DiscoveryStrategy {
           // Accept rel=describedby and rel=profile.
           if (!href) continue
           if (!relValues.includes('describedby') && !relValues.includes('profile')) continue
-          if (!shouldTryDeclaredType(type, Boolean((signpostingLink.profile ?? '').trim()))) continue
+          if (!shouldAcceptDeclaredType(type, hasNonEmptyProfileAttribute(signpostingLink.profile))) continue
 
           // Resolve relative URL against sitemap URL
           const metaUrl = new URL(href, sitemapUrl).toString()
