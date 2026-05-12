@@ -140,6 +140,148 @@ interface RDFOverview {
 
 ---
 
+## Strategy Pipeline Architecture
+
+`wrx.js` uses a **modular strategy pipeline** where each RDF discovery method is implemented as a standalone strategy class. All strategies follow a common interface (`DiscoveryStrategy`) and are orchestrated by a central pipeline.
+
+### Core Concepts
+
+#### `DiscoveryStrategy` Interface
+
+Each strategy implements two modes:
+
+```typescript
+interface DiscoveryStrategy {
+  // Single-hit mode: return first success or null
+  executeFirstHit(ctx: StrategyContext): Promise<ExtractedRDF | null>
+
+  // All-hits mode: collect all successes exhaustively
+  executeAllHits(ctx: StrategyContext): Promise<ExtractedRDF[]>
+
+  label: string;              // Human-readable name
+  source: ExtractedRDF['source'];  // Strategy identifier
+}
+```
+
+#### `StrategyContext` — Shared State
+
+All strategies receive a shared context object to avoid redundant fetches:
+
+```typescript
+interface StrategyContext {
+  uri: string;              // Resource being interrogated
+  linksetUrl?: string;      // Optional explicit linkset URL
+  bodyText: string;         // HTML body (fetched once, shared)
+  linkHeader: string | null;// HTTP Link header (parsed once)
+  htmlDoc: Document | null; // Parsed HTML (if DOMParser available)
+}
+```
+
+The pipeline **builds this context once** and passes it to all strategies in order. This means:
+- Initial fetch → read body text once → all strategies reuse it
+- HTML parsing → happen once if DOMParser available → shared across all strategies
+- Later strategies benefit from work done by earlier strategies
+
+### Built-in Strategies
+
+All strategies live in `src/strategies/`:
+
+| Strategy | Location | Source Tag | Description |
+|---|---|---|---|
+| **Content Negotiation** | `content-negotiation.ts` | `'content-negotiation'` | RFC 7231 Accept header negotiation |
+| **HTTP Link Header** | `link-header.ts` | `'signposting-link-header'` | RFC 8288 Link header & rel=describedby |
+| **Linkset** | `linkset.ts` | `'linkset'` | RFC 9264 Linkset + anchor matching + cite-as fallback |
+| **HTML Link Signposting** | `html-signposting.ts` | `'signposting-html-link'` | FAIR signposting: link[rel=describedby] in HTML |
+| **Embedded Script** | `embedded-script.ts` | `'embedded-script'` | Extracts script[type="application/ld+json"] etc |
+| **Sitemap Signposting** | `sitemap-signposting.ts` | `'sitemap-signposting'` | robots.txt → sitemap.xml → xhtml:link |
+
+### Execution Flow
+
+**`extractRDF(uri)`** — Single-hit mode:
+1. Build `StrategyContext` (fetch initial response, parse HTML if needed)
+2. Try strategies in `STRATEGY_ORDER` (see [src/core/constants.ts](src/core/constants.ts))
+3. Return first successful `ExtractedRDF` or `null`
+
+**`extractAllRDF(uri)`** — All-hits mode:
+1. Build `StrategyContext`
+2. Run **all strategies exhaustively** (even after finding RDF)
+3. Collect all results + trace metrics per strategy
+4. Return `RDFOverview` with `.found`, `.trace`, `.contentNegotiations`
+
+Both modes are orchestrated by `src/strategies/pipeline.ts`:
+```typescript
+export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null> { }
+export async function discoverAllRdf(uri: string): Promise<RDFOverview> { }
+```
+
+### Adding a New Strategy
+
+To add a custom RDF discovery strategy:
+
+1. **Create strategy class** — `src/strategies/my-strategy.ts`:
+   ```typescript
+   export class MyStrategy implements DiscoveryStrategy {
+     readonly label = 'My Custom Strategy'
+     readonly source: ExtractedRDF['source'] = 'my-strategy' // Update type
+
+     async executeFirstHit(ctx: StrategyContext): Promise<ExtractedRDF | null> {
+       // Return first RDF match or null
+     }
+
+     async executeAllHits(ctx: StrategyContext): Promise<ExtractedRDF[]> {
+       // Return all RDF matches
+     }
+   }
+   ```
+
+2. **Add strategy label** — Update [src/core/types.ts](src/core/types.ts) `ExtractedRDF['source']` union type to include your strategy source name.
+
+3. **Register in pipeline** — Add to `STRATEGY_ORDER` in [src/core/constants.ts](src/core/constants.ts).
+
+4. **Write unit tests** — Create `src/strategies/my-strategy.test.ts` following the patterns in existing test files. Mock `fetch` and `DOMParser` as needed.
+
+5. **Run tests**:
+   ```bash
+   bun test
+   ```
+
+### Testing Individual Strategies
+
+Each strategy has dedicated unit tests in `src/strategies/*.test.ts`. Common patterns:
+
+- **Mock fetch** for HTTP responses
+- **Test both modes** (`executeFirstHit` + `executeAllHits`)
+- **Test edge cases**: missing headers, parsing failures, relative URL resolution
+- **Verify deduplication** in all-hits mode
+
+Example test pattern:
+```typescript
+test('executeFirstHit returns RDF from describedby link', async () => {
+  globalThis.fetch = (async (url) => {
+    if (url === 'https://example.com/metadata.ttl') {
+      return new Response(rdfBody, {
+        status: 200,
+        headers: { 'content-type': 'text/turtle' },
+      })
+    }
+    return new Response('Not found', { status: 404 })
+  })
+
+  const ctx: StrategyContext = {
+    uri: 'https://example.com/resource',
+    bodyText: '<html>...</html>',
+    linkHeader: '<https://example.com/metadata.ttl>; rel="describedby"',
+    htmlDoc: null,
+  }
+
+  const result = await strategy.executeFirstHit(ctx)
+  expect(result).not.toBeNull()
+  expect(result?.source).toBe('signposting-link-header')
+})
+```
+
+---
+
 ## Extraction Strategy — Full Flowchart
 
 The diagram below captures every decision branch inside `extractRDF()`.
