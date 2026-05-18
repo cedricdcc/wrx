@@ -65,12 +65,11 @@ function parseRdfText(content: string, mime: string): Promise<ReturnType<typeof 
   if (normalizedMime === 'application/ld+json') {
     return (async () => {
       const parsed = JSON.parse(content);
-      // Prevent jsonld from attempting to dereference remote contexts during conversion
+      // Fallback only: avoid remote context dereferencing when conversion fails.
       function sanitizeContext(obj: any): any {
         if (!obj || typeof obj !== 'object') return obj;
         if (Array.isArray(obj)) return obj.map(sanitizeContext);
         if (typeof obj['@context'] === 'string') {
-          // Replace remote context URL with an empty context to avoid network fetches
           obj = { ...obj, '@context': {} };
         } else if (typeof obj['@context'] === 'object') {
           obj = { ...obj, '@context': sanitizeContext(obj['@context']) };
@@ -78,9 +77,14 @@ function parseRdfText(content: string, mime: string): Promise<ReturnType<typeof 
         return obj;
       }
 
-      const safeParsed = sanitizeContext(parsed);
-      const nquads = await jsonld.toRDF(safeParsed, { format: 'application/n-quads' });
-      return parseRdfText(String(nquads), 'application/n-quads');
+      try {
+        const nquads = await jsonld.toRDF(parsed, { format: 'application/n-quads' });
+        return parseRdfText(String(nquads), 'application/n-quads');
+      } catch {
+        const safeParsed = sanitizeContext(parsed);
+        const nquads = await jsonld.toRDF(safeParsed, { format: 'application/n-quads' });
+        return parseRdfText(String(nquads), 'application/n-quads');
+      }
     })();
   }
 

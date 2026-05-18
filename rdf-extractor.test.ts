@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { extractAllRDF, extractRDF, runWrxCli } from './wrx.js';
 import { parseCliArgs } from './src/cli/args.ts';
-import { resolveOutputTarget, writeRdfOutput } from './src/cli/output.ts';
+import { resolveOutputTarget, writeMergedRdfOutput, writeRdfOutput } from './src/cli/output.ts';
 import type { ExtractedRDF } from './src/core/types.ts';
 import { resolve } from 'node:path';
 import { unlink } from 'node:fs/promises';
+import jsonld from 'jsonld';
 
 const originalFetch = globalThis.fetch;
 const originalDOMParser = (globalThis as { DOMParser?: unknown }).DOMParser;
@@ -1001,6 +1002,39 @@ describe('runWrxCli', () => {
     await expect(writeRdfOutput(document, 'wrx-cli-output-test.ttl')).rejects.toThrow(
       'Serialization from application/ld+json to text/turtle is not implemented yet'
     );
+  });
+
+  test('keeps remote JSON-LD context on first merged-conversion attempt', async () => {
+    const outputFile = resolve(process.cwd(), 'wrx-cli-merged-jsonld-output-test.ttl');
+    const originalToRdf = jsonld.toRDF;
+    let observedContext: unknown;
+    const document: ExtractedRDF = {
+      uri: 'https://cli.example/resource',
+      content: JSON.stringify({
+        '@context': 'https://schema.org/',
+        '@id': 'https://cli.example/resource',
+        '@type': 'Dataset',
+        name: 'Merged output context test',
+      }),
+      mime: 'application/ld+json',
+      format: 'application/ld+json',
+      source: 'content-negotiation',
+    };
+
+    (jsonld as unknown as { toRDF: typeof jsonld.toRDF }).toRDF = (async (input: unknown) => {
+      observedContext = (input as { '@context'?: unknown })['@context'];
+      return '<https://cli.example/resource> <https://schema.org/name> "Merged output context test" .\n';
+    }) as typeof jsonld.toRDF;
+
+    try {
+      await writeMergedRdfOutput([document], [], 'wrx-cli-merged-jsonld-output-test.ttl');
+      expect(observedContext).toBe('https://schema.org/');
+      const fileText = await Bun.file(outputFile).text();
+      expect(fileText).toContain('schema.org/name');
+    } finally {
+      (jsonld as unknown as { toRDF: typeof jsonld.toRDF }).toRDF = originalToRdf;
+      await unlink(outputFile).catch(() => undefined);
+    }
   });
 
   test('keeps baseline single-mode output without new flags', async () => {
