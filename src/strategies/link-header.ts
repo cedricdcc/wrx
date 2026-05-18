@@ -71,6 +71,7 @@ export class LinkHeaderStrategy implements DiscoveryStrategy {
         if (format && res.ok) {
           return {
             content: body,
+            mime: format,
             format,
             source: this.source,
             url: metaUrl,
@@ -130,6 +131,7 @@ export class LinkHeaderStrategy implements DiscoveryStrategy {
         if (format && res.ok) {
           found.push({
             content: body,
+            mime: format,
             format,
             source: this.source,
             url: metaUrl,

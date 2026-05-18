@@ -42,6 +42,7 @@ export class HtmlSignpostingStrategy implements DiscoveryStrategy {
           if (isRDFMime(ct) && res.ok) {
             return {
               content: await res.text(),
+              mime: ct,
               format: ct,
               source: this.source,
               url: metaUrl,
@@ -80,6 +81,7 @@ export class HtmlSignpostingStrategy implements DiscoveryStrategy {
           if (isRDFMime(ct) && res.ok) {
             found.push({
               content: await res.text(),
+              mime: ct,
               format: ct,
               source: this.source,
               url: metaUrl,

@@ -178,6 +178,7 @@ export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null
   if (ctx.initialOk && isRDFMime(ctx.initialMime)) {
     return {
       content: ctx.initialBody,
+      mime: ctx.initialMime,
       format: ctx.initialMime as ExtractedRDF['format'],
       source: 'content-negotiation',
       url: uri,
@@ -215,6 +216,7 @@ export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
       if (!existing) {
         connegHits.push({
           content: probe.body,
+          mime: probe.responseMime,
           format: probe.responseMime as ExtractedRDF['format'],
           source: 'content-negotiation',
           url: uri,

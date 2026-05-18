@@ -252,6 +252,7 @@ export class SitemapSignpostingStrategy implements DiscoveryStrategy {
             if (format && metaRes.ok) {
               const rdf: ExtractedRDF = {
                 content: body,
+                mime: format,
                 format,
                 source: this.source,
                 url: metaUrl,

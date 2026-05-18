@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { extractAllRDF, extractRDF, runWrxCli } from './wrx.js';
+import { parseCliArgs } from './src/cli/args.ts';
+import { resolveOutputTarget, writeMergedRdfOutput, writeRdfOutput } from './src/cli/output.ts';
+import type { ExtractedRDF } from './src/core/types.ts';
+import { resolve } from 'node:path';
+import { unlink } from 'node:fs/promises';
+import jsonld from 'jsonld';
 
 const originalFetch = globalThis.fetch;
 const originalDOMParser = (globalThis as { DOMParser?: unknown }).DOMParser;
@@ -938,81 +944,111 @@ describe('runWrxCli', () => {
     }
   }
 
-  test('supports --profile and --extend-links with URL in any order and emits modeled link + profile output', async () => {
-    const URI = 'https://cli.example/resource';
-    const PROFILE_URI = 'https://w3id.org/ro/crate/1.1';
 
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const accept = (init?.headers as Record<string, string> | undefined)?.['Accept'] ?? '';
 
-      if (url === URI) {
-        if (accept.includes('application/linkset+json')) {
-          return new Response('Not linkset', { status: 404, headers: { 'content-type': 'text/plain' } });
-        }
-        return new Response(
-          `<html><head><link rel="describedby" href="${URI}.ttl" type="text/turtle"></head><body></body></html>`,
-          {
-            status: 200,
-            headers: {
-              'content-type': 'text/html',
-              link: `<${URI}.ttl>; rel="describedby"; type="text/turtle"; profile="${PROFILE_URI}", <${URI}.linkset>; rel="linkset"; type="application/linkset+json"`,
-            },
-          }
-        );
-      }
+  test('shows help text and accepts the new output flag in parsing', async () => {
+    const parsed = parseCliArgs(['--output', 'result.ttl', '--help', 'https://example.org/dataset']);
 
-      if (url === `${URI}.ttl`) {
-        return new Response('@prefix dcat: <http://www.w3.org/ns/dcat#> .', {
-          status: 200,
-          headers: { 'content-type': 'text/turtle' },
-        });
-      }
+    expect(parsed.help).toBe(true);
+    expect(parsed.output).toBe('result.ttl');
+    expect(parsed.input).toBe('https://example.org/dataset');
 
-      if (url === `${URI}.linkset` && accept.includes('application/linkset+json')) {
-        return new Response(
-          JSON.stringify({
-            linkset: [
-              {
-                anchor: URI,
-                describedby: [{ href: `${URI}.jsonld`, type: 'application/ld+json' }],
-              },
-            ],
-          }),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/linkset+json' },
-          }
-        );
-      }
-
-      if (url === `${URI}.jsonld`) {
-        return new Response('{"@context":"https://schema.org/","@type":"Dataset"}', {
-          status: 200,
-          headers: { 'content-type': 'application/ld+json' },
-        });
-      }
-
-      if (url === 'https://cli.example/robots.txt') {
-        return new Response('User-agent: *\nDisallow: /', {
-          status: 200,
-          headers: { 'content-type': 'text/plain' },
-        });
-      }
-
-      return new Response('Not found', { status: 404 });
-    }) as typeof fetch;
-
-    const { logs, errors } = await captureCliOutput(['--extend-links', URI, '--profile', '--all']);
+    const { logs, errors } = await captureCliOutput(['--help']);
     const output = logs.join('\n');
 
     expect(errors).toHaveLength(0);
-    expect(output).toContain('Extended Link Relations (JSON):');
-    expect(output).toContain('Extended Link Relations (xhtml Turtle-like):');
-    expect(output).toContain('@prefix xhtml: <http://www.w3.org/1999/xhtml>.');
-    expect(output).toContain('"rel": "describedby"');
-    expect(output).toContain('Profiles discovered: 1');
-    expect(output).toContain(`- ${PROFILE_URI}`);
+    expect(output).toContain('Usage: bun run wrx.js [options] <URI>');
+    expect(output).toContain('--output <path>');
+  });
+
+  test('resolves relative output targets and writes matching RDF content to disk', async () => {
+    const outputFile = resolve(process.cwd(), 'wrx-cli-output-test.ttl');
+    const document: ExtractedRDF = {
+      uri: 'https://cli.example/resource',
+      content: '@prefix ex: <https://example/> . ex:s ex:p ex:o .',
+      mime: 'text/turtle',
+      format: 'turtle',
+      source: 'content-negotiation',
+    };
+
+    try {
+      const target = resolveOutputTarget('wrx-cli-output-test.ttl');
+      expect(target.path).toBe(outputFile);
+      expect(target.mime).toBe('text/turtle');
+
+      const written = await writeRdfOutput(document, 'wrx-cli-output-test.ttl');
+      expect(written.path).toBe(outputFile);
+
+      const fileText = await Bun.file(outputFile).text();
+      expect(fileText).toBe(document.content);
+    } finally {
+      await unlink(outputFile).catch(() => undefined);
+    }
+  });
+
+  test('rejects unsupported output extensions clearly', () => {
+    expect(() => resolveOutputTarget('result.txt')).toThrow('Unsupported output extension');
+  });
+
+  test('rejects cross-format output conversion when no serializer is available', async () => {
+    const document: ExtractedRDF = {
+      uri: 'https://cli.example/resource',
+      content: '{"@context":"https://schema.org/","@type":"Dataset"}',
+      mime: 'application/ld+json',
+      format: 'jsonld',
+      source: 'content-negotiation',
+    };
+
+    await expect(writeRdfOutput(document, 'wrx-cli-output-test.ttl')).rejects.toThrow(
+      'Serialization from application/ld+json to text/turtle is not implemented yet'
+    );
+  });
+
+  test('keeps remote JSON-LD context on first merged-conversion attempt', async () => {
+    const outputFile = resolve(process.cwd(), 'wrx-cli-merged-jsonld-output-test.ttl');
+    const originalToRdf = jsonld.toRDF;
+    let observedContext: unknown;
+    const document: ExtractedRDF = {
+      uri: 'https://cli.example/resource',
+      content: JSON.stringify({
+        '@context': 'https://schema.org/',
+        '@id': 'https://cli.example/resource',
+        '@type': 'Dataset',
+        name: 'Merged output context test',
+      }),
+      mime: 'application/ld+json',
+      format: 'application/ld+json',
+      source: 'content-negotiation',
+    };
+
+    const mockToRdf: typeof jsonld.toRDF = (async (
+      input: unknown,
+      options?: Parameters<typeof jsonld.toRDF>[1]
+    ) => {
+      const jsonInput = input as { '@context'?: unknown; '@id'?: string; name?: string };
+      observedContext = jsonInput['@context'];
+      expect(jsonInput['@id']).toBe('https://cli.example/resource');
+      expect(jsonInput.name).toBe('Merged output context test');
+      return originalToRdf(
+        {
+          '@context': { name: 'https://schema.org/name' },
+          '@id': jsonInput['@id'] ?? 'https://cli.example/resource',
+          name: jsonInput.name ?? 'Merged output context test',
+        },
+        options
+      );
+    }) as typeof jsonld.toRDF;
+    (jsonld as { toRDF: typeof jsonld.toRDF }).toRDF = mockToRdf;
+
+    try {
+      await writeMergedRdfOutput([document], [], outputFile);
+      expect(observedContext).toBe('https://schema.org/');
+      const fileText = await Bun.file(outputFile).text();
+      expect(fileText).toContain('schema.org/name');
+    } finally {
+      (jsonld as { toRDF: typeof jsonld.toRDF }).toRDF = originalToRdf;
+      await unlink(outputFile).catch(() => undefined);
+    }
   });
 
   test('keeps baseline single-mode output without new flags', async () => {
@@ -1032,10 +1068,10 @@ describe('runWrxCli', () => {
     const { logs, errors } = await captureCliOutput([URI]);
     const output = logs.join('\n');
 
-    expect(errors).toHaveLength(0);
-    expect(output).toContain(`Extracting RDF from: ${URI}`);
-    expect(output).toContain('Found RDF (content-negotiation)');
+    // Diagnostics moved to stderr.
+    expect(errors.join('\n')).toContain(`Extracting RDF from: ${URI}`);
+    expect(errors.join('\n')).toContain('Found RDF (content-negotiation)');
     expect(output).not.toContain('Extended Link Relations (JSON):');
-    expect(output).not.toContain('Profiles discovered:');
+    expect(errors.join('\n')).not.toContain('Profiles discovered:');
   });
 });

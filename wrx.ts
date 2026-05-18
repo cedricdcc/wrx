@@ -7,10 +7,7 @@ import {
   ExtractedRDF,
   ContentNegotiationResult,
   RDFOverview,
-  LinkRelationOption,
   LinkRelationObservation,
-  LinkRelationOrigin,
-  ParsedCliArgs,
 } from './src/core/types';
 
 import { STRATEGY_ORDER, RDF_MIME_SET, RDF_ACCEPT } from './src/core/constants';
@@ -47,96 +44,6 @@ const STRATEGY_LABELS: Record<ExtractedRDF['source'], string> = {
   'embedded-script':        'Embedded RDF script',
   'sitemap-signposting':    'Sitemap signposting (robots.txt)',
 };
-
-/** Check if a MIME type is a linkset format */
-function isLinksetMime(mime: string): boolean {
-  const m = mime.toLowerCase().trim();
-  return m === 'application/linkset+json' || m === 'application/linkset';
-}
-
-function isRDFMime(mime: string): boolean {
-  return RDF_MIME_SET.has((mime ?? '').toLowerCase().trim());
-}
-
-function parseCliArgs(args: string[]): ParsedCliArgs {
-  let allMode = false;
-  let profileMode = false;
-  let extendLinksMode = false;
-  let url: string | null = null;
-
-  for (const arg of args) {
-    if (arg === '--all') {
-      allMode = true;
-      continue;
-    }
-    if (arg === '--profile') {
-      profileMode = true;
-      continue;
-    }
-    if (arg === '--extend-links') {
-      extendLinksMode = true;
-      continue;
-    }
-    if (arg.startsWith('--')) {
-      throw new Error(`Unknown flag: ${arg}`);
-    }
-    if (!url) {
-      url = arg;
-      continue;
-    }
-    throw new Error(`Unexpected extra positional argument: ${arg}`);
-  }
-
-  return { allMode, profileMode, extendLinksMode, url };
-}
-
-// Link relation helpers are implemented in src/core/link-parser.ts; keep
-// rendering helpers here for CLI output.
-
-function escapeLiteral(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
-function renderRelForTurtle(rel: string): string {
-  return isAbsoluteUri(rel) ? `<${rel}>` : `"${escapeLiteral(rel)}"`;
-}
-
-function renderLinkRelationsJson(relations: LinkRelationObservation[]): string {
-  return JSON.stringify(
-    relations.map((rel) => ({
-      anchor: rel.anchor,
-      rel: rel.rel,
-      href: rel.href,
-      origin: rel.origin,
-      options: rel.options,
-    })),
-    null,
-    2
-  );
-}
-
-function renderLinkRelationsTurtle(relations: LinkRelationObservation[]): string {
-  const lines: string[] = ['@prefix xhtml: <http://www.w3.org/1999/xhtml>.', ''];
-  for (const rel of relations) {
-    lines.push('[] a xhtml:link;');
-    lines.push(`   xhtml:anchor <${rel.anchor}>;`);
-    lines.push(`   xhtml:rel ${renderRelForTurtle(rel.rel)};`);
-    lines.push(`   xhtml:href <${rel.href}>;`);
-    if (rel.options.length > 0) {
-      const optionNodes = rel.options.map((opt) => {
-        const optName = (opt as any).name ?? (opt as any).key ?? '';
-        const optVal = (opt as any).value ?? '';
-        return `[ a xhtml:LinkOption;\n       xhtml:optionKey \"${escapeLiteral(optName)}\";\n       xhtml:optionVal \"${escapeLiteral(optVal)}\" ]`;
-      });
-      lines.push(`   xhtml:option ${optionNodes.join(',\n                ')}.`);
-    } else {
-      lines.push('   xhtml:option [].');
-    }
-    lines.push('');
-  }
-  return lines.join('\n').trimEnd();
-}
-
 
 // Linkset and sitemap/DCAT extraction are implemented in strategy modules.
 
@@ -197,118 +104,7 @@ function collectProfileValues(relations: LinkRelationObservation[]): string[] {
   return [...profiles]
 }
 
-export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise<void> {
-  let parsed: ParsedCliArgs
-  try {
-    parsed = parseCliArgs(args)
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error))
-    return
-  }
-
-  const parsedArgs = parsed as unknown as { url?: string | null; allMode?: boolean; profileMode?: boolean; extendLinksMode?: boolean }
-  const url = parsedArgs.url ?? null
-  const allMode = Boolean(parsedArgs.allMode)
-  const profileMode = Boolean(parsedArgs.profileMode)
-  const extendLinksMode = Boolean(parsedArgs.extendLinksMode)
-
-  if (!url) {
-    console.error('Usage: bun run wrx.js [--all] [--profile] [--extend-links] <URI>')
-    return
-  }
-
-  if (allMode) {
-    const overview = await extractAllRDF(url)
-
-    console.log(`🔍 Extracting RDF from: ${url}`)
-    console.log('')
-    console.log('📊 Strategy Trace:')
-    for (const step of overview.trace) {
-      const hits = step.hits
-      const stratNum = step.strategy
-      const label = step.label
-      if (step.source === 'content-negotiation') {
-        const rdfHits = overview.contentNegotiations.filter((r) => r.isRdf)
-        if (rdfHits.length > 0) {
-          console.log(`  ✅ Strategy ${stratNum} — ${label} (${rdfHits.length} RDF format(s) found)`)
-        } else {
-          console.log(`  ❌ Strategy ${stratNum} — ${label}`)
-        }
-        const reqW = overview.contentNegotiations.length > 0
-          ? Math.max(...overview.contentNegotiations.map((r) => r.requestedMime.length), 'Requested MIME'.length)
-          : 'Requested MIME'.length
-        const resW = overview.contentNegotiations.length > 0
-          ? Math.max(...overview.contentNegotiations.map((r) => r.responseMime.length), 'Response MIME'.length)
-          : 'Response MIME'.length
-        console.log(`       ${'Requested MIME'.padEnd(reqW)}  →  ${'Response MIME'.padEnd(resW)}  Chars`)
-        console.log(`       ${'─'.repeat(reqW)}     ${'─'.repeat(resW)}  ─────`)
-        for (const cn of overview.contentNegotiations) {
-          const flag = cn.isRdf ? '✅' : '❌'
-          console.log(`       ${cn.requestedMime.padEnd(reqW)}  →  ${cn.responseMime.padEnd(resW)}  ${cn.chars.toLocaleString().padStart(7)}  ${flag}`)
-        }
-      } else if (hits.length > 0) {
-        console.log(`  ✅ Strategy ${stratNum} — ${label}`)
-        for (const hit of hits) {
-          console.log(`       ${hit.format}  ${hit.url}  (${hit.chars} chars)`)
-        }
-      } else {
-        console.log(`  ❌ Strategy ${stratNum} — ${label}`)
-      }
-    }
-
-    console.log('')
-    if (overview.contentNegotiations.length > 0) {
-      console.log('📋 Content Negotiation Overview (all MIME types):')
-      for (const cn of overview.contentNegotiations) {
-        const flag = cn.isRdf ? '✅ RDF' : '❌ not RDF'
-        console.log(`   ${cn.requestedMime.padEnd(26)} → ${cn.chars.toLocaleString().padStart(7)} chars  (${cn.responseMime})  ${flag}`)
-      }
-      console.log('')
-    }
-
-    if (overview.found.length > 0) {
-      console.log(`📊 ${overview.found.length} unique RDF source(s) found across ${STRATEGY_ORDER.length} strategies tried.`)
-    } else {
-      console.log('📊 No RDF found after exploring all strategies.')
-    }
-  } else {
-    console.log(`🔍 Extracting RDF from: ${url}`)
-    const result = await extractRDF(url)
-    if (result) {
-      console.log(`✅ Found RDF (${result.source}) from ${result.url}`)
-      console.log(`Format: ${result.format}`)
-      console.log(`Content length: ${result.content.length} chars`)
-      console.log('\n--- First 500 chars of RDF ---')
-      console.log(result.content.slice(0, 500) + (result.content.length > 500 ? '...' : ''))
-    } else {
-      console.log('❌ No RDF found after trying all strategies.')
-    }
-  }
-
-  if (extendLinksMode) {
-    const relations = await collectLinkRelationsForUri(url)
-    console.log('')
-    console.log('🔗 Extended Link Relations (JSON):')
-    console.log(renderLinkRelationsJson(relations))
-    console.log('')
-    console.log('🔗 Extended Link Relations (xhtml Turtle-like):')
-    console.log(renderLinkRelationsTurtle(relations))
-  }
-
-  if (profileMode) {
-    const relations = await collectLinkRelationsForUri(url)
-    const profiles = collectProfileValues(relations)
-
-    console.log('')
-    console.log(`🧪 Profiles discovered: ${profiles.length}`)
-    if (profiles.length > 0) {
-      for (const profile of profiles) {
-        console.log(`   - ${profile}`)
-      }
-    }
-  }
-}
-
 if (import.meta.main) {
+  const { runWrxCli } = await import('./src/cli/run.ts');
   await runWrxCli()
 }
