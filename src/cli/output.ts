@@ -66,24 +66,32 @@ function parseRdfText(content: string, mime: string): Promise<ReturnType<typeof 
     return (async () => {
       const parsed = JSON.parse(content);
       // Fallback only: avoid remote context dereferencing when conversion fails.
-      function sanitizeContext(obj: any): any {
+      function stripRemoteContextUrls(obj: unknown): unknown {
         if (!obj || typeof obj !== 'object') return obj;
-        if (Array.isArray(obj)) return obj.map(sanitizeContext);
-        if (typeof obj['@context'] === 'string') {
-          obj = { ...obj, '@context': {} };
-        } else if (typeof obj['@context'] === 'object') {
-          obj = { ...obj, '@context': sanitizeContext(obj['@context']) };
+        if (Array.isArray(obj)) return obj.map(stripRemoteContextUrls);
+        const jsonObject = obj as Record<string, unknown>;
+        if (typeof jsonObject['@context'] === 'string') {
+          return { ...jsonObject, '@context': {} };
         }
-        return obj;
+        if (typeof jsonObject['@context'] === 'object') {
+          return { ...jsonObject, '@context': stripRemoteContextUrls(jsonObject['@context']) };
+        }
+        return jsonObject;
       }
 
       try {
         const nquads = await jsonld.toRDF(parsed, { format: 'application/n-quads' });
         return parseRdfText(String(nquads), 'application/n-quads');
-      } catch {
-        const safeParsed = sanitizeContext(parsed);
-        const nquads = await jsonld.toRDF(safeParsed, { format: 'application/n-quads' });
-        return parseRdfText(String(nquads), 'application/n-quads');
+      } catch (primaryError) {
+        const safeParsed = stripRemoteContextUrls(parsed);
+        try {
+          const nquads = await jsonld.toRDF(safeParsed, { format: 'application/n-quads' });
+          return parseRdfText(String(nquads), 'application/n-quads');
+        } catch (fallbackError) {
+          const primaryMessage = primaryError instanceof Error ? primaryError.message : String(primaryError);
+          const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+          throw new Error(`Failed to convert JSON-LD to RDF: primary="${primaryMessage}", fallback="${fallbackMessage}"`);
+        }
       }
     })();
   }

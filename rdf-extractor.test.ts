@@ -1021,18 +1021,32 @@ describe('runWrxCli', () => {
       source: 'content-negotiation',
     };
 
-    (jsonld as unknown as { toRDF: typeof jsonld.toRDF }).toRDF = (async (input: unknown) => {
-      observedContext = (input as { '@context'?: unknown })['@context'];
-      return '<https://cli.example/resource> <https://schema.org/name> "Merged output context test" .\n';
+    const mockToRdf: typeof jsonld.toRDF = (async (
+      input: unknown,
+      options?: Parameters<typeof jsonld.toRDF>[1]
+    ) => {
+      const jsonInput = input as { '@context'?: unknown; '@id'?: string; name?: string };
+      observedContext = jsonInput['@context'];
+      expect(jsonInput['@id']).toBe('https://cli.example/resource');
+      expect(jsonInput.name).toBe('Merged output context test');
+      return originalToRdf(
+        {
+          '@context': { name: 'https://schema.org/name' },
+          '@id': jsonInput['@id'] ?? 'https://cli.example/resource',
+          name: jsonInput.name ?? 'Merged output context test',
+        },
+        options
+      );
     }) as typeof jsonld.toRDF;
+    (jsonld as { toRDF: typeof jsonld.toRDF }).toRDF = mockToRdf;
 
     try {
-      await writeMergedRdfOutput([document], [], 'wrx-cli-merged-jsonld-output-test.ttl');
+      await writeMergedRdfOutput([document], [], outputFile);
       expect(observedContext).toBe('https://schema.org/');
       const fileText = await Bun.file(outputFile).text();
       expect(fileText).toContain('schema.org/name');
     } finally {
-      (jsonld as unknown as { toRDF: typeof jsonld.toRDF }).toRDF = originalToRdf;
+      (jsonld as { toRDF: typeof jsonld.toRDF }).toRDF = originalToRdf;
       await unlink(outputFile).catch(() => undefined);
     }
   });
