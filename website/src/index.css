@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-accent: #3d7a8d;
+  --color-accent-light: #64b5f6;
+  --color-accent-glow: rgba(61, 122, 141, 0.3);
+  --color-poster-bg: #f8fafc;
+  --color-poster-dark: #1a3b4c;
+}
+
+@layer base {
+  body {
+    @apply bg-poster-bg text-poster-dark antialiased overflow-x-hidden font-sans;
+  }
+}
+
+.title-glow {
+  @apply bg-linear-to-b from-poster-dark via-poster-dark to-[#666] bg-clip-text text-transparent;
+}
+
+.data-grid {
+  background-image: 
+    linear-gradient(to right, rgba(26, 59, 76, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(26, 59, 76, 0.05) 1px, transparent 1px);
+  background-size: 80px 80px;
+}
+
+.glow-line {
+  box-shadow: 0 0 10px var(--color-accent);
+}
+
+.strategy-card-blueprint {
+  @apply bg-white border border-accent/20 shadow-xl shadow-accent/5 backdrop-blur-md;
+}
+
+.path-water {
+  @apply bg-linear-to-b from-accent/20 to-accent/5;
+}
