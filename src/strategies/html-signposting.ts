@@ -2,6 +2,7 @@ import type { ExtractedRDF } from '../core/types'
 import type { StrategyContext, DiscoveryStrategy } from './strategy-interface'
 import { fetchRDF } from '../core/fetch'
 import { baseMime, isRDFMime, relHasToken } from '../core/utils'
+import { resolveRdfFormat } from '../core/mime'
 
 /**
  * HTML Signposting Strategy (FAIR signposting)
@@ -38,12 +39,14 @@ export class HtmlSignpostingStrategy implements DiscoveryStrategy {
         try {
           const res = await fetchRDF(metaUrl)
           const ct = baseMime(res.headers.get('content-type'))
+          const body = await res.text()
+          const format = resolveRdfFormat(ct, type || undefined, body)
 
-          if (isRDFMime(ct) && res.ok) {
+          if (format && res.ok) {
             return {
-              content: await res.text(),
-              mime: ct,
-              format: ct,
+              content: body,
+              mime: format,
+              format,
               source: this.source,
               url: metaUrl,
             }
@@ -77,12 +80,14 @@ export class HtmlSignpostingStrategy implements DiscoveryStrategy {
         try {
           const res = await fetchRDF(metaUrl)
           const ct = baseMime(res.headers.get('content-type'))
+          const body = await res.text()
+          const format = resolveRdfFormat(ct, type || undefined, body)
 
-          if (isRDFMime(ct) && res.ok) {
+          if (format && res.ok) {
             found.push({
-              content: await res.text(),
-              mime: ct,
-              format: ct,
+              content: body,
+              mime: format,
+              format,
               source: this.source,
               url: metaUrl,
             })

@@ -80,9 +80,14 @@ function parseRdfText(content: string, mime: string, baseIRI?: string): Promise<
         return jsonObject;
       }
 
-      const safeParsed = sanitizeContext(parsed);
-      const nquads = await jsonld.toRDF(safeParsed, { format: 'application/n-quads', base: baseIRI });
-      return parseRdfText(String(nquads), 'application/n-quads', baseIRI);
+      try {
+        const nquads = await jsonld.toRDF(parsed, { format: 'application/n-quads', base: baseIRI });
+        return parseRdfText(String(nquads), 'application/n-quads', baseIRI);
+      } catch {
+        const safeParsed = stripRemoteContextUrls(parsed);
+        const nquads = await jsonld.toRDF(safeParsed, { format: 'application/n-quads', base: baseIRI });
+        return parseRdfText(String(nquads), 'application/n-quads', baseIRI);
+      }
     })();
   }
 

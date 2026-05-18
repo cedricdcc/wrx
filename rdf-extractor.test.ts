@@ -999,8 +999,8 @@ describe('runWrxCli', () => {
       source: 'content-negotiation',
     };
 
-    await expect(writeRdfOutput(document, 'wrx-cli-output-test.ttl')).rejects.toThrow(
-      'Serialization from application/ld+json to text/turtle is not implemented yet'
+    await expect(writeRdfOutput(document, 'wrx-cli-output-test.rdf')).rejects.toThrow(
+      'RDF/XML conversion is not supported yet'
     );
   });
 
