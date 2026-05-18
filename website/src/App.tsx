@@ -291,14 +291,14 @@ const StrategiesSection = () => {
 };
 
 const TryOutSection = () => {
-  const [uri, setUri] = useState("https://ruben.verborgh.org/profile/");
+  const [uri, setUri] = useState("https://data.emobon.embrc.eu");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   // SPARQL State
   const [query, setQuery] = useState(`SELECT ?p ?o WHERE {
-  <https://ruben.verborgh.org/profile/#me> ?p ?o.
+  <https://data.emobon.embrc.eu> ?p ?o.
 } LIMIT 10`);
   const [sparqlResults, setSparqlResults] = useState<any[]>([]);
   const [filteredTriples, setFilteredTriples] = useState<any[] | null>(null);
