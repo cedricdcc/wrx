@@ -23,6 +23,10 @@ import {
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import KnowledgeGraph from "./components/KnowledgeGraph";
+import { extractRDF } from "wrx";
+import * as N3 from "n3";
+import { QueryEngine } from "@comunica/query-sparql-rdfjs";
+import jsonld from "jsonld";
 
 const STRATEGIES = [
   {
@@ -319,8 +323,76 @@ const TryOutSection = () => {
     setSparqlResults([]);
 
     try {
-      const response = await axios.post('/api/extract', { uri: uriToFetch });
-      const newData = response.data;
+      // Direct client-side RDF extraction using WRX
+      const wrxResult = await extractRDF(uriToFetch);
+      
+      if (!wrxResult || !wrxResult.content) {
+        throw new Error("No RDF content found");
+      }
+
+      const triples: any[] = [];
+      let parsed = false;
+
+      // Ensure content is a string
+      const contentStr = typeof wrxResult.content === 'string' 
+        ? wrxResult.content 
+        : JSON.stringify(wrxResult.content);
+
+      const format = (wrxResult.format || '').toLowerCase();
+
+      try {
+        if (format.includes('json') && format.includes('ld')) {
+          // JSON-LD support
+          const json = JSON.parse(contentStr);
+          const nquads = await jsonld.toRDF(json, { format: 'application/n-quads' });
+          const parser = new N3.Parser({ format: 'N-Quads', baseIRI: wrxResult.url });
+          const quads = parser.parse(nquads as string);
+          quads.forEach(quad => {
+            let datatype = '';
+            if (quad.object.termType === 'Literal') {
+              datatype = quad.object.datatype.value;
+            }
+            triples.push({
+              subject: quad.subject.value,
+              predicate: quad.predicate.value,
+              object: quad.object.value,
+              objectType: quad.object.termType,
+              datatype: datatype
+            });
+          });
+          parsed = true;
+        } else {
+          // Try N3 parser (supports Turtle, N-Triples, N-Quads, TriG)
+          const parser = new N3.Parser({ baseIRI: wrxResult.url });
+          const quads = parser.parse(contentStr);
+          quads.forEach(quad => {
+            let datatype = '';
+            if (quad.object.termType === 'Literal') {
+              datatype = quad.object.datatype.value;
+            }
+            triples.push({
+              subject: quad.subject.value,
+              predicate: quad.predicate.value,
+              object: quad.object.value,
+              objectType: quad.object.termType,
+              datatype: datatype
+            });
+          });
+          parsed = true;
+        }
+      } catch (e: any) {
+        console.error(`Parsing failed for format ${format}:`, e);
+      }
+
+      const newData = {
+        metadata: {
+          source: wrxResult.source,
+          format: wrxResult.format,
+          url: wrxResult.url
+        },
+        triples,
+        rawContent: parsed ? null : contentStr
+      };
 
       // Tag triples with their source URI for grouping in the graph
       const taggedTriples = (newData.triples || []).map((t: any) => ({
@@ -390,11 +462,31 @@ const TryOutSection = () => {
     setQuerying(true);
     setSparqlError(null);
     try {
-      const response = await axios.post('/api/query', {
-        triples: result.triples,
-        query
+      const store = new N3.Store();
+      const { namedNode, literal, defaultGraph } = N3.DataFactory;
+
+      result.triples.forEach((t: any) => {
+        store.addQuad(
+          namedNode(t.subject),
+          namedNode(t.predicate),
+          t.objectType === 'Literal' ? literal(t.object) : namedNode(t.object),
+          defaultGraph()
+        );
       });
-      const results = response.data.results;
+
+      const myEngine = new QueryEngine();
+      const bindingsStream = await myEngine.queryBindings(query, {
+        sources: [store],
+      });
+
+      const bindings = await bindingsStream.toArray();
+      const results = bindings.map(b => {
+        const resObj: any = {};
+        for (const [key, value] of b) {
+          resObj[key.value] = value.value;
+        }
+        return resObj;
+      });
       setSparqlResults(results);
 
       if (results.length > 0) {

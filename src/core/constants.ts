@@ -1,4 +1,4 @@
-import { StrategyName } from './types'
+import type { StrategyName } from './types'
 
 export const STRATEGY_ORDER: StrategyName[] = [
   'content-negotiation',

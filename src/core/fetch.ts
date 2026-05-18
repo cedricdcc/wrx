@@ -1,8 +1,34 @@
 import { RDF_ACCEPT } from './constants'
 import { baseMime } from './utils'
 
-function fetchWithRedirect(url: string, init?: RequestInit): Promise<Response> {
-  return fetch(url, { ...init, redirect: 'follow' });
+async function fetchWithRedirect(url: string, init?: RequestInit): Promise<Response> {
+  const isBrowser = typeof window !== 'undefined';
+  const targetUrl = isBrowser
+    ? `https://corsproxy.io/?${encodeURIComponent(url)}`
+    : url;
+
+  const res = await fetch(targetUrl, { ...init, redirect: 'follow' });
+
+  if (isBrowser) {
+    let cleanUrl = res.url;
+    if (cleanUrl.startsWith('https://corsproxy.io/?')) {
+      const param = cleanUrl.substring('https://corsproxy.io/?'.length);
+      try {
+        cleanUrl = decodeURIComponent(param);
+      } catch {
+        cleanUrl = param;
+      }
+    }
+
+    Object.defineProperty(res, 'url', {
+      value: cleanUrl,
+      writable: false,
+      configurable: true,
+      enumerable: true
+    });
+  }
+
+  return res;
 }
 
 function fetchRDF(url: string): Promise<Response> {

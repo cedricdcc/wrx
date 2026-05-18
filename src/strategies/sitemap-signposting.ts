@@ -1,5 +1,5 @@
-import { ExtractedRDF } from '../core/types'
-import { StrategyContext, DiscoveryStrategy } from './strategy-interface'
+import type { ExtractedRDF } from '../core/types'
+import type { StrategyContext, DiscoveryStrategy } from './strategy-interface'
 import { fetchWithRedirect, fetchRDF } from '../core/fetch'
 import { baseMime, splitRelValues } from '../core/utils'
 import { resolveRdfFormat } from '../core/mime'

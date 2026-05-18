@@ -1,5 +1,5 @@
-import { ExtractedRDF } from '../core/types'
-import { StrategyContext, DiscoveryStrategy } from './strategy-interface'
+import type { ExtractedRDF } from '../core/types'
+import type { StrategyContext, DiscoveryStrategy } from './strategy-interface'
 import { parseLinkHeader } from '../core/link-parser'
 import { fetchRDF } from '../core/fetch'
 import { baseMime, isRDFMime, normUri, isLinksetMime } from '../core/utils'

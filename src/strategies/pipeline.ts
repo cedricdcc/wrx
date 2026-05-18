@@ -1,5 +1,5 @@
-import { ExtractedRDF, RDF_MIME_SET } from '../core/types'
-import { STRATEGY_ORDER, RDF_MIMES } from '../core/constants'
+import type { ExtractedRDF } from '../core/types'
+import { STRATEGY_ORDER, RDF_MIMES, RDF_MIME_SET } from '../core/constants'
 import { fetchWithRedirect, fetchHeadLinkHeader, fetchHtmlFallback, fetchRDF } from '../core/fetch'
 import { baseMime, isRDFMime, normUri } from '../core/utils'
 import { extractHtmlHints } from '../core/html-parser'

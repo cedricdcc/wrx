@@ -1,5 +1,5 @@
-import { ExtractedRDF, ContentNegotiationResult } from '../core/types'
-import { StrategyContext, DiscoveryStrategy } from './strategy-interface'
+import type { ExtractedRDF, ContentNegotiationResult } from '../core/types'
+import type { StrategyContext, DiscoveryStrategy } from './strategy-interface'
 import { fetchRDF, fetchWithRedirect } from '../core/fetch'
 import { baseMime, isRDFMime } from '../core/utils'
 import { RDF_MIMES } from '../core/constants'

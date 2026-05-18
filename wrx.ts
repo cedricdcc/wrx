@@ -3,7 +3,7 @@
 // Run with: bun run wrx.js (or import the function in your Bun project)
 // No external dependencies — uses only built-in Bun/fetch + DOMParser (available in Bun).
 
-import {
+import type {
   ExtractedRDF,
   ContentNegotiationResult,
   RDFOverview,
@@ -105,6 +105,9 @@ function collectProfileValues(relations: LinkRelationObservation[]): string[] {
 }
 
 if (import.meta.main) {
-  const { runWrxCli } = await import('./src/cli/run.ts');
-  await runWrxCli()
+  (async () => {
+    const cliPath = './src/cli/run.ts';
+    const { runWrxCli } = await import(/* @vite-ignore */ cliPath);
+    await runWrxCli();
+  })();
 }

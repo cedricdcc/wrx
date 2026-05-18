@@ -1,4 +1,4 @@
-import { ExtractedRDF } from '../core/types'
+import type { ExtractedRDF } from '../core/types'
 
 /**
  * Context passed to each discovery strategy.
