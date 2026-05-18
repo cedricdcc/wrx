@@ -66,17 +66,18 @@ function parseRdfText(content: string, mime: string, baseIRI?: string): Promise<
   if (normalizedMime === 'application/ld+json') {
     return (async () => {
       const parsed = JSON.parse(content);
-      // Prevent jsonld from attempting to dereference remote contexts during conversion
-      function sanitizeContext(obj: any): any {
+      // Fallback only: avoid remote context dereferencing when conversion fails.
+      function stripRemoteContextUrls(obj: unknown): unknown {
         if (!obj || typeof obj !== 'object') return obj;
-        if (Array.isArray(obj)) return obj.map(sanitizeContext);
-        if (typeof obj['@context'] === 'string') {
-          // Replace remote context URL with an empty context to avoid network fetches
-          obj = { ...obj, '@context': {} };
-        } else if (typeof obj['@context'] === 'object') {
-          obj = { ...obj, '@context': sanitizeContext(obj['@context']) };
+        if (Array.isArray(obj)) return obj.map(stripRemoteContextUrls);
+        const jsonObject = obj as Record<string, unknown>;
+        if (typeof jsonObject['@context'] === 'string') {
+          return { ...jsonObject, '@context': {} };
         }
-        return obj;
+        if (typeof jsonObject['@context'] === 'object') {
+          return { ...jsonObject, '@context': stripRemoteContextUrls(jsonObject['@context']) };
+        }
+        return jsonObject;
       }
 
       const safeParsed = sanitizeContext(parsed);
