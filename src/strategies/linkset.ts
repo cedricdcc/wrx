@@ -116,7 +116,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
               const format = resolveRdfFormat(metaCt, target.type, body)
 
               if (format) {
-                return { content: body, format, source: this.source, url: metaUrl }
+                return { content: body, mime: format, format, source: this.source, url: metaUrl }
               }
             } catch {
               // Skip this target
@@ -141,6 +141,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
             if (isRDFMime(doiCt)) {
               return {
                 content: await doiRes.text(),
+                mime: doiCt,
                 format: doiCt,
                 source: this.source,
                 url: doiUrl,
@@ -178,7 +179,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
             const format = resolveRdfFormat(metaCt, declaredType, body)
 
             if (format) {
-              return { content: body, format, source: this.source, url: metaUrl }
+              return { content: body, mime: format, format, source: this.source, url: metaUrl }
             }
           } catch {
             // Skip
@@ -251,7 +252,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
               const format = resolveRdfFormat(metaCt, target.type, body)
 
               if (format) {
-                results.push({ content: body, format, source: this.source, url: metaUrl })
+                results.push({ content: body, mime: format, format, source: this.source, url: metaUrl })
               }
             } catch {
               // Skip this target
@@ -276,6 +277,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
             if (isRDFMime(doiCt)) {
               results.push({
                 content: await doiRes.text(),
+                mime: doiCt,
                 format: doiCt,
                 source: this.source,
                 url: doiUrl,
@@ -311,7 +313,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
             const format = resolveRdfFormat(metaCt, declaredType, body)
 
             if (format) {
-              results.push({ content: body, format, source: this.source, url: metaUrl })
+              results.push({ content: body, mime: format, format, source: this.source, url: metaUrl })
             }
           } catch {
             // Skip

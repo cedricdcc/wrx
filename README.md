@@ -1,7 +1,7 @@
 # wrx
 Web resource extraction for RDF metadata discovery.
 
-`wrx.js` is the public entrypoint in this repository. It uses a cascading discovery strategy: content negotiation first, then FAIR signposting through HTTP and HTML links, then linkset resolution, embedded RDF scripts, and finally sitemap/DCAT fallback.
+`wrx.js` is the public entrypoint in this repository. It uses a cascading discovery strategy: content negotiation first, then FAIR signposting through HTTP and HTML links, then linkset resolution, embedded RDF scripts, and finally sitemap/DCAT fallback. The CLI parser and runner live in separate modules under `src/cli/`.
 
 ## Install
 
@@ -35,6 +35,12 @@ Quick first-match mode:
 bun run wrx.js https://example.org/dataset
 ```
 
+Show CLI help:
+
+```sh
+bun run wrx.js --help
+```
+
 Explore all extraction strategies:
 
 ```sh
@@ -53,6 +59,12 @@ Enable FAIR profile discovery summary:
 bun run wrx.js --profile https://example.org/dataset
 ```
 
+Write the extracted RDF to a file chosen by extension:
+
+```sh
+bun run wrx.js --output dataset.ttl https://example.org/dataset
+```
+
 Flags can be combined, for example:
 
 ```sh
@@ -60,6 +72,8 @@ bun run wrx.js --all --extend-links --profile https://example.org/dataset
 ```
 
 `--profile` now reports discovered profile URIs from Link headers/linksets (including `profile` link-extension attributes and `rel=profile` targets).
+
+`--output` writes the extracted RDF payload to the requested path. Relative paths are resolved from the current working directory, and the destination extension must map to a supported RDF MIME type.
 
 In addition to RDF extraction, the library also exports `extractLinkRelations(uri)` to harvest modeled web-link relations (e.g., `describedby`, `cite-as`, `item`, `license`, `author`) for signposting graph use cases.
 

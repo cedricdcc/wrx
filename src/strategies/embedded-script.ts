@@ -31,6 +31,7 @@ export class EmbeddedScriptStrategy implements DiscoveryStrategy {
       if (isRDFMime(type)) {
         return {
           content: script.content,
+          mime: type,
           format: type,
           source: this.source,
           url: ctx.uri,
@@ -59,6 +60,7 @@ export class EmbeddedScriptStrategy implements DiscoveryStrategy {
       if (isRDFMime(type)) {
         found.push({
           content: script.content,
+          mime: type,
           format: type,
           source: this.source,
           url: ctx.uri,

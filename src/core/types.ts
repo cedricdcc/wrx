@@ -42,7 +42,7 @@ export interface LinkRelationOrigin {
 
 export interface LinkRelationObservation {
   anchor?: string
-  rel: string[]
+  rel: string
   href: string
   title?: string
   hreflang?: string
@@ -54,10 +54,10 @@ export interface LinkRelationObservation {
 export interface ParsedCliArgs {
   all?: boolean
   extendLinks?: boolean
-  profile?: boolean
+  help?: boolean
   input?: string
   output?: string
-  format?: string
+  profile?: boolean
 }
 
 export type StrategyName =

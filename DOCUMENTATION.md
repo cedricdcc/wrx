@@ -4,6 +4,8 @@
 
 `wrx.js` is a zero-dependency Bun/TypeScript module for web resource extraction from any URI. It retrieves RDF metadata using a **cascading strategy**: each discovery step is tried in priority order and the first successful result is immediately returned. The module never requires external npm packages — it uses only Bun's built-in `fetch`, `URL`, and `DOMParser`.
 
+The CLI entrypoint is split from the parser/runner implementation: `wrx.ts` remains the library surface, while `src/cli/` owns argument parsing, help text, and output-path handling.
+
 ---
 
 ## Reference specifications
@@ -77,6 +79,13 @@ graph TB
 | `RDFOverview` | Returned by `extractAllRDF()` — all hits + strategies that found nothing |
 | `RDF_MIMES` | `Set<string>` of all recognised RDF MIME types |
 | `RDF_ACCEPT` | The `Accept` header value sent during generic content negotiation |
+
+### CLI contract
+
+- `--help` / `-h` prints usage information and exits.
+- `--output <path>` writes RDF to a file path resolved from the current working directory when relative.
+- The destination file extension determines the target RDF MIME type.
+- If the requested output MIME does not match the source RDF syntax, the CLI currently fails clearly instead of guessing a conversion.
 
 #### `ExtractedRDF` interface
 

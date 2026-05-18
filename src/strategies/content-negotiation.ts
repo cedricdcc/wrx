@@ -30,6 +30,7 @@ export class ContentNegotiationStrategy implements DiscoveryStrategy {
       if (res.ok && isRDFMime(ct)) {
         return {
           content: body,
+          mime: ct,
           format: ct,
           source: this.source,
           url: ctx.uri,
@@ -72,6 +73,7 @@ export class ContentNegotiationStrategy implements DiscoveryStrategy {
           seenFormats.add(ct);
           found.push({
             content: body,
+            mime: ct,
             format: ct,
             source: this.source,
             url: ctx.uri,

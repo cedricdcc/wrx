@@ -11,6 +11,7 @@ declare global {
   var process: {
     argv: string[];
     exit(code?: number): never;
+    cwd(): string;
   };
 }
 
