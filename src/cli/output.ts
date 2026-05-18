@@ -19,6 +19,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 export interface ResolvedOutputTarget {
   path: string;
   mime: string;
+  tripleCount?: number;
 }
 
 function normalizeMime(mime: string | undefined): string {
@@ -59,7 +60,7 @@ function mimeToWriterFormat(mime: string): string {
   }
 }
 
-function parseRdfText(content: string, mime: string): Promise<ReturnType<typeof DataFactory.quad>[]> {
+function parseRdfText(content: string, mime: string, baseIRI?: string): Promise<ReturnType<typeof DataFactory.quad>[]> {
   const normalizedMime = normalizeMime(mime);
 
   if (normalizedMime === 'application/ld+json') {
@@ -79,8 +80,8 @@ function parseRdfText(content: string, mime: string): Promise<ReturnType<typeof 
       }
 
       const safeParsed = sanitizeContext(parsed);
-      const nquads = await jsonld.toRDF(safeParsed, { format: 'application/n-quads' });
-      return parseRdfText(String(nquads), 'application/n-quads');
+      const nquads = await jsonld.toRDF(safeParsed, { format: 'application/n-quads', base: baseIRI });
+      return parseRdfText(String(nquads), 'application/n-quads', baseIRI);
     })();
   }
 
@@ -89,7 +90,7 @@ function parseRdfText(content: string, mime: string): Promise<ReturnType<typeof 
     throw new Error(`Unsupported RDF source MIME for merging: ${mime}`);
   }
 
-  const parser = new Parser({ format: parserFormat as never });
+  const parser = new Parser({ format: parserFormat as never, baseIRI });
   const quads: ReturnType<typeof DataFactory.quad>[] = [];
 
   return new Promise<ReturnType<typeof DataFactory.quad>[]>((resolve, reject) => {
@@ -149,18 +150,22 @@ async function mergeRdfDocuments(
   const merged: ReturnType<typeof DataFactory.quad>[] = [];
 
   for (const document of documents) {
-    const quads = await parseRdfText(document.content, document.mime);
-    for (const quad of quads) {
-      const key = quad.toString();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push(quad);
+    try {
+      const quads = await parseRdfText(document.content, document.mime, (document as any).url || document.uri);
+      for (const quad of quads) {
+        const key = JSON.stringify(quad);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(quad);
+      }
+    } catch (error) {
+      console.error(`⚠️ Skipping document for merging: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   for (const relation of relations) {
     for (const quad of relationToQuads(relation)) {
-      const key = quad.toString();
+      const key = JSON.stringify(quad);
       if (seen.has(key)) continue;
       seen.add(key);
       merged.push(quad);
@@ -261,14 +266,28 @@ export async function serializeRdfForOutput(document: ExtractedRDF, outputMime: 
     return document.content;
   }
 
-  throw new Error(`Serialization from ${document.mime} to ${outputMime} is not implemented yet`);
+  try {
+    const quads = await parseRdfText(document.content, sourceMime, (document as any).url || document.uri);
+    return await serializeMergedQuads(quads, targetMime);
+  } catch (error) {
+    throw new Error(`Serialization from ${document.mime} to ${outputMime} failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 export async function writeRdfOutput(document: ExtractedRDF, outputPath: string): Promise<ResolvedOutputTarget> {
   const target = resolveOutputTarget(outputPath);
   const serialized = await serializeRdfForOutput(document, target.mime);
   await Bun.write(target.path, serialized);
-  return target;
+
+  let tripleCount: number | undefined;
+  try {
+    const quads = await parseRdfText(serialized, target.mime, (document as any).url || document.uri);
+    tripleCount = quads.length;
+  } catch (error) {
+    // Ignore error if we cannot parse the output format (e.g. unsupported MIME)
+  }
+
+  return { ...target, tripleCount };
 }
 
 export async function writeMergedRdfOutput(
@@ -280,5 +299,5 @@ export async function writeMergedRdfOutput(
   const merged = await mergeRdfDocuments(documents, relations);
   const serialized = await serializeMergedQuads(merged, target.mime);
   await Bun.write(target.path, serialized);
-  return target;
+  return { ...target, tripleCount: merged.length };
 }

@@ -91,6 +91,9 @@ async function writeOutputIfRequested(parsed: ReturnType<typeof parseCliArgs>, r
   console.error('');
   console.error(`💾 Wrote RDF output to: ${target.path}`);
   console.error(`   MIME: ${target.mime}`);
+  if (target.tripleCount !== undefined) {
+    console.error(`   Triples: ${target.tripleCount}`);
+  }
 }
 
 async function writeMergedOutputIfRequested(
@@ -106,6 +109,9 @@ async function writeMergedOutputIfRequested(
   console.error('');
   console.error(`💾 Wrote RDF output to: ${target.path}`);
   console.error(`   MIME: ${target.mime}`);
+  if (target.tripleCount !== undefined) {
+    console.error(`   Triples: ${target.tripleCount}`);
+  }
 }
 
 export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise<void> {
@@ -230,7 +236,7 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
     if (parsed.output) {
       if (parsed.extendLinks || parsed.all) {
         const documentsToWrite = mergedDocuments.length > 0 ? mergedDocuments : outputDocument ? [outputDocument] : [];
-        await writeMergedRdfOutput(documentsToWrite, mergedRelations, parsed.output);
+        await writeMergedOutputIfRequested(parsed, documentsToWrite, mergedRelations);
       } else {
         await writeOutputIfRequested(parsed, outputDocument);
       }

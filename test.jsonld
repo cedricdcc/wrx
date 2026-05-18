@@ -1,0 +1,1861 @@
+[
+  {
+    "@id": "_:n3-0",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "author"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://orcid.org/0009-0007-5534-1020"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-1"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-10",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-11"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-11",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-12",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-13"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-13",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/ld+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-14",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-15"
+      },
+      {
+        "@id": "_:n3-16"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-15",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "\"application/ld+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-16",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "profile"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "https://datapackage.org/profiles/2.0/datapackage.json\""
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-17",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-18"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-18",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/marcxml+xml"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-19",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-20"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-2",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "author"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://orcid.org/0000-0001-9577-6247"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-3"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-20",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.citationstyles.csl+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-21",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-22"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-22",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.datacite.datacite+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-23",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-24"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-24",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.datacite.datacite+xml"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-25",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-26"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-26",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.geo+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-27",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-28"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-28",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.inveniordm.v1+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-29",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-30"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-30",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.inveniordm.v1.full+csv"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-31",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-32"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-32",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.inveniordm.v1.simple+csv"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-33",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-34"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-34",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/x-bibtex"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-35",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-36"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-36",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/x-dc+xml"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-37",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-38"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-38",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "text/x-bibliography"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-39",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "item"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/records/20267549/files/SCC-VRP-Instances.zip"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-40"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-4",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "author"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://orcid.org/0000-0002-7675-8577"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-5"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-40",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/zip"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-41",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "license"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://creativecommons.org/licenses/by/4.0/legalcode"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-42"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-43",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://schema.org/Dataset"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-44"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-45",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://schema.org/AboutPage"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-46"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-47",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "linkset"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-48"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-48",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/linkset+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-49",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "author"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://orcid.org/0009-0007-5534-1020"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-50"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-51",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "author"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://orcid.org/0000-0001-9577-6247"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-52"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-53",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "author"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://orcid.org/0000-0002-7675-8577"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-54"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-55",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "cite-as"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://doi.org/10.5281/zenodo.20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-56"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-57",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-58"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-58",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/dcat+xml"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-59",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-60"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-6",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "cite-as"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://doi.org/10.5281/zenodo.20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-7"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-60",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-61",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-62"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-62",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/ld+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-63",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-64"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-64",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/ld+json;profile=\"https://datapackage.org/profiles/2.0/datapackage.json\""
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-65",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-66"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-66",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/marcxml+xml"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-67",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-68"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-68",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.citationstyles.csl+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-69",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-70"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-70",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.datacite.datacite+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-71",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-72"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-72",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.datacite.datacite+xml"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-73",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-74"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-74",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.geo+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-75",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-76"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-76",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.inveniordm.v1+json"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-77",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-78"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-78",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.inveniordm.v1.full+csv"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-79",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-80"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-8",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-9"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-80",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/vnd.inveniordm.v1.simple+csv"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-81",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-82"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-82",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/x-bibtex"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-83",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-84"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-84",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/x-dc+xml"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-85",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describedby"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-86"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-86",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "text/x-bibliography"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-87",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "item"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/records/20267549/files/SCC-VRP-Instances.zip"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-88"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-88",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/zip"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-89",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "license"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://creativecommons.org/licenses/by/4.0/legalcode"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-90"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-9",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "application/dcat+xml"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-91",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://schema.org/Dataset"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-92"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-93",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://schema.org/AboutPage"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-94"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-95",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/records/20267549/files/SCC-VRP-Instances.zip"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "collection"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-96"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-96",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "text/html"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-97",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#link"
+    ],
+    "http://www.w3.org/1999/xhtml#anchor": [
+      {
+        "@id": "https://zenodo.org/api/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#rel": [
+      {
+        "@value": "describes"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#href": [
+      {
+        "@id": "https://zenodo.org/records/20267549"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#option": [
+      {
+        "@id": "_:n3-98"
+      }
+    ]
+  },
+  {
+    "@id": "_:n3-98",
+    "@type": [
+      "http://www.w3.org/1999/xhtml#LinkOption"
+    ],
+    "http://www.w3.org/1999/xhtml#optionKey": [
+      {
+        "@value": "type"
+      }
+    ],
+    "http://www.w3.org/1999/xhtml#optionVal": [
+      {
+        "@value": "text/html"
+      }
+    ]
+  },
+  {
+    "@id": "https://doi.org/10.5281/zenodo.20267549",
+    "@type": [
+      "https://schema.org/Dataset"
+    ]
+  }
+]
