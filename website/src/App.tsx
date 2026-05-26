@@ -23,7 +23,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import KnowledgeGraph from "./components/KnowledgeGraph";
-import { extractRDF } from "wrx";
+import { extractRDF, extractLinkRelations } from "wrx";
 import * as N3 from "n3";
 import { QueryEngine } from "@comunica/query-sparql-rdfjs";
 import jsonld from "jsonld";
@@ -178,7 +178,7 @@ const BlueBox = ({ scrollOpacity }: { scrollOpacity: any }) => {
   );
 };
 
-const StrategyCard = ({ strategy, index }: { strategy: typeof STRATEGIES[0], index: number }) => {
+const StrategyCard = ({ strategy, index }: { strategy: typeof STRATEGIES[0], index: number, key?: any }) => {
   const Icon = strategy.icon;
 
   return (
@@ -290,6 +290,109 @@ const StrategiesSection = () => {
   );
 };
 
+function convertRelationsToTriples(relations: any[], sourceUri: string): any[] {
+  const triples: any[] = [];
+  const xhtml = 'http://www.w3.org/1999/xhtml#';
+  const rdfType = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+
+  for (const relation of relations) {
+    // Generate a unique blank node ID for this link relation
+    const blankNodeId = `_:b_link_${Math.random().toString(36).substring(2, 9)}`;
+
+    triples.push({
+      subject: blankNodeId,
+      predicate: rdfType,
+      object: `${xhtml}link`,
+      objectType: 'NamedNode',
+      datatype: '',
+      sourceUri
+    });
+
+    triples.push({
+      subject: blankNodeId,
+      predicate: `${xhtml}anchor`,
+      object: relation.anchor ?? relation.href,
+      objectType: 'NamedNode',
+      datatype: '',
+      sourceUri
+    });
+
+    const isRelAbsolute = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(relation.rel);
+    triples.push({
+      subject: blankNodeId,
+      predicate: `${xhtml}rel`,
+      object: relation.rel,
+      objectType: isRelAbsolute ? 'NamedNode' : 'Literal',
+      datatype: '',
+      sourceUri
+    });
+
+    triples.push({
+      subject: blankNodeId,
+      predicate: `${xhtml}href`,
+      object: relation.href,
+      objectType: 'NamedNode',
+      datatype: '',
+      sourceUri
+    });
+
+    const options = relation.options ?? [];
+    for (const option of options) {
+      const optionNodeId = `_:b_opt_${Math.random().toString(36).substring(2, 9)}`;
+      
+      triples.push({
+        subject: blankNodeId,
+        predicate: `${xhtml}option`,
+        object: optionNodeId,
+        objectType: 'BlankNode',
+        datatype: '',
+        sourceUri
+      });
+
+      triples.push({
+        subject: optionNodeId,
+        predicate: rdfType,
+        object: `${xhtml}LinkOption`,
+        objectType: 'NamedNode',
+        datatype: '',
+        sourceUri
+      });
+
+      triples.push({
+        subject: optionNodeId,
+        predicate: `${xhtml}optionKey`,
+        object: option.name ?? '',
+        objectType: 'Literal',
+        datatype: '',
+        sourceUri
+      });
+
+      triples.push({
+        subject: optionNodeId,
+        predicate: `${xhtml}optionVal`,
+        object: option.value ?? '',
+        objectType: 'Literal',
+        datatype: '',
+        sourceUri
+      });
+    }
+
+    if (options.length === 0) {
+      const emptyOptionNodeId = `_:b_opt_${Math.random().toString(36).substring(2, 9)}`;
+      triples.push({
+        subject: blankNodeId,
+        predicate: `${xhtml}option`,
+        object: emptyOptionNodeId,
+        objectType: 'BlankNode',
+        datatype: '',
+        sourceUri
+      });
+    }
+  }
+
+  return triples;
+}
+
 const TryOutSection = () => {
   const [uri, setUri] = useState("https://data.emobon.embrc.eu");
   const [loading, setLoading] = useState(false);
@@ -310,6 +413,7 @@ const TryOutSection = () => {
   const [showUriActions, setShowUriActions] = useState(false);
 
   const [triplesAddedFeedback, setTriplesAddedFeedback] = useState<{ count: number, show: boolean }>({ count: 0, show: false });
+  const [extendLinks, setExtendLinks] = useState(true);
 
   const handleExtract = async (e?: any, targetUri?: string, append: boolean = false) => {
     if (e) e.preventDefault();
@@ -324,71 +428,98 @@ const TryOutSection = () => {
 
     try {
       // Direct client-side RDF extraction using WRX
-      const wrxResult = await extractRDF(uriToFetch);
+      const [wrxResult, linkRelations] = await Promise.all([
+        extractRDF(uriToFetch).catch(() => null),
+        extendLinks ? extractLinkRelations(uriToFetch).catch(err => {
+          console.error("Failed to extract link relations:", err);
+          return [];
+        }) : Promise.resolve([])
+      ]);
       
-      if (!wrxResult || !wrxResult.content) {
-        throw new Error("No RDF content found");
+      const hasRdf = !!(wrxResult && wrxResult.content);
+      const hasLinks = !!(linkRelations && linkRelations.length > 0);
+
+      if (!hasRdf && !hasLinks) {
+        throw new Error("No RDF content or web-link relations found");
       }
 
-      const triples: any[] = [];
+      let triples: any[] = [];
       let parsed = false;
+      let contentStr = "";
+      let format = "";
+      let source = "";
+      let url = uriToFetch;
 
-      // Ensure content is a string
-      const contentStr = typeof wrxResult.content === 'string' 
-        ? wrxResult.content 
-        : JSON.stringify(wrxResult.content);
+      if (hasRdf && wrxResult) {
+        contentStr = typeof wrxResult.content === 'string' 
+          ? wrxResult.content 
+          : JSON.stringify(wrxResult.content);
+        format = (wrxResult.format || '').toLowerCase();
+        source = wrxResult.source || 'Content Negotiation';
+        url = wrxResult.url || uriToFetch;
 
-      const format = (wrxResult.format || '').toLowerCase();
-
-      try {
-        if (format.includes('json') && format.includes('ld')) {
-          // JSON-LD support
-          const json = JSON.parse(contentStr);
-          const nquads = await jsonld.toRDF(json, { format: 'application/n-quads' });
-          const parser = new N3.Parser({ format: 'N-Quads', baseIRI: wrxResult.url });
-          const quads = parser.parse(nquads as string);
-          quads.forEach(quad => {
-            let datatype = '';
-            if (quad.object.termType === 'Literal') {
-              datatype = quad.object.datatype.value;
-            }
-            triples.push({
-              subject: quad.subject.value,
-              predicate: quad.predicate.value,
-              object: quad.object.value,
-              objectType: quad.object.termType,
-              datatype: datatype
+        try {
+          if (format.includes('json') && format.includes('ld')) {
+            // JSON-LD support
+            const json = JSON.parse(contentStr);
+            const nquads = await jsonld.toRDF(json, { format: 'application/n-quads' });
+            const parser = new N3.Parser({ format: 'N-Quads', baseIRI: url });
+            const quads = parser.parse(nquads as string);
+            quads.forEach(quad => {
+              let datatype = '';
+              if (quad.object.termType === 'Literal') {
+                datatype = quad.object.datatype.value;
+              }
+              triples.push({
+                subject: quad.subject.value,
+                predicate: quad.predicate.value,
+                object: quad.object.value,
+                objectType: quad.object.termType,
+                datatype: datatype
+              });
             });
-          });
-          parsed = true;
-        } else {
-          // Try N3 parser (supports Turtle, N-Triples, N-Quads, TriG)
-          const parser = new N3.Parser({ baseIRI: wrxResult.url });
-          const quads = parser.parse(contentStr);
-          quads.forEach(quad => {
-            let datatype = '';
-            if (quad.object.termType === 'Literal') {
-              datatype = quad.object.datatype.value;
-            }
-            triples.push({
-              subject: quad.subject.value,
-              predicate: quad.predicate.value,
-              object: quad.object.value,
-              objectType: quad.object.termType,
-              datatype: datatype
+            parsed = true;
+          } else {
+            // Try N3 parser (supports Turtle, N-Triples, N-Quads, TriG)
+            const parser = new N3.Parser({ baseIRI: url });
+            const quads = parser.parse(contentStr);
+            quads.forEach(quad => {
+              let datatype = '';
+              if (quad.object.termType === 'Literal') {
+                datatype = quad.object.datatype.value;
+              }
+              triples.push({
+                subject: quad.subject.value,
+                predicate: quad.predicate.value,
+                object: quad.object.value,
+                objectType: quad.object.termType,
+                datatype: datatype
+              });
             });
-          });
-          parsed = true;
+            parsed = true;
+          }
+        } catch (e: any) {
+          console.error(`Parsing failed for format ${format}:`, e);
         }
-      } catch (e: any) {
-        console.error(`Parsing failed for format ${format}:`, e);
+      } else {
+        source = "Extended Web-Link Relations";
+        format = "linkset-relations";
+      }
+
+      // Convert Link Relations to Triples and merge
+      let extendedLinksCount = 0;
+      if (hasLinks && linkRelations) {
+        const relationTriples = convertRelationsToTriples(linkRelations, uriToFetch);
+        extendedLinksCount = relationTriples.length;
+        triples = [...triples, ...relationTriples];
       }
 
       const newData = {
         metadata: {
-          source: wrxResult.source,
-          format: wrxResult.format,
-          url: wrxResult.url
+          source,
+          format,
+          url,
+          extendedLinksCount
         },
         triples,
         rawContent: parsed ? null : contentStr
@@ -397,7 +528,7 @@ const TryOutSection = () => {
       // Tag triples with their source URI for grouping in the graph
       const taggedTriples = (newData.triples || []).map((t: any) => ({
         ...t,
-        sourceUri: uriToFetch
+        sourceUri: t.sourceUri || uriToFetch
       }));
 
       if (append && result) {
@@ -549,8 +680,8 @@ const TryOutSection = () => {
         </h2>
       </div>
 
-      <div className="strategy-card-blueprint p-8 rounded-2xl mb-12">
-        <form onSubmit={(e) => handleExtract(e)} className="flex flex-col md:flex-row gap-4">
+      <div className="strategy-card-blueprint p-8 rounded-2xl mb-12 flex flex-col gap-4">
+        <form onSubmit={(e) => handleExtract(e)} className="flex flex-col md:flex-row gap-4 w-full">
           <input
             type="url"
             value={uri}
@@ -568,6 +699,21 @@ const TryOutSection = () => {
             Extract
           </button>
         </form>
+
+        <div className="flex items-center gap-2 select-none border-t border-accent/5 pt-3">
+          <label className="relative flex items-center gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={extendLinks}
+              onChange={(e) => setExtendLinks(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-10 h-6 bg-accent/10 border border-accent/30 rounded-full peer-checked:bg-accent relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4 transition-colors" />
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[#4a5568] group-hover:text-accent transition-colors flex items-center gap-1.5">
+              <Link2 size={13} className="text-accent" /> Extend Links (Include Web-Link Relations as Triples)
+            </span>
+          </label>
+        </div>
       </div>
 
       {error && (
@@ -589,7 +735,14 @@ const TryOutSection = () => {
             </div>
             <div className="p-6 bg-white border border-accent/10 rounded-xl shadow-sm">
               <div className="text-[10px] uppercase tracking-widest text-[#666] mb-2">Total Triples</div>
-              <div className="font-bold text-poster-dark">{result.triples ? result.triples.length : 0}</div>
+              <div className="font-bold text-poster-dark flex items-center gap-2">
+                <span>{result.triples ? result.triples.length : 0}</span>
+                {result.metadata.extendedLinksCount > 0 && (
+                  <span className="text-[9px] font-bold text-accent bg-accent/5 px-2 py-0.5 rounded-full border border-accent/10 whitespace-nowrap">
+                    +{result.metadata.extendedLinksCount} web-links
+                  </span>
+                )}
+              </div>
             </div>
             <div className="p-6 bg-white border border-accent/10 rounded-xl shadow-sm">
               <div className="text-[10px] uppercase tracking-widest text-[#666] mb-2">Active URI</div>

@@ -18,6 +18,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "wrx": [
+        "../wrx.ts"
       ]
     },
     "allowImportingTsExtensions": true,
