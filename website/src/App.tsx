@@ -18,7 +18,13 @@ import {
   Play,
   Loader2,
   TerminalSquare,
-  Network
+  Network,
+  CheckCircle2,
+  Clock,
+  BookOpen,
+  Activity,
+  ChevronDown,
+  Check
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
@@ -28,50 +34,111 @@ import * as N3 from "n3";
 import { QueryEngine } from "@comunica/query-sparql-rdfjs";
 import jsonld from "jsonld";
 
-const STRATEGIES = [
-  {
-    id: "conneg",
-    title: "1. Content Negotiation (Conneg)",
-    description: "Negotiating directly with the server by sending targeted HTTP requests containing standardized RDF MIME types in the Accept header. By specifying exact quality values (e.g., q=0.9) for formats like Turtle, JSON-LD, RDF/XML, and N-Triples, WRX cleanly prompts the server to return the structured metadata representation of the resource directly, avoiding generic HTML payloads.",
-    icon: Globe,
-    details: ["Accept: text/turtle", "Accept: application/ld+json", "Quality Values (q-factor)", "MIME Type Resolution"]
-  },
-  {
-    id: "fair",
-    title: "2. FAIR Signposting",
-    description: "Inspecting HTTP response headers and HTML headers for explicit relations defined by the FAIR Signposting profile. By scanning for relations like 'describedby' (pointing to metadata), 'cite-as' (persistent identifiers), and 'item' (resource parts), WRX extracts highly reliable links to semantic metadata that the publisher explicitly registered for machine consumption.",
-    icon: Search,
-    details: ["Link Headers", "rel=describedby", "rel=cite-as", "FAIR Principles"]
-  },
-  {
-    id: "linkset",
-    title: "3. RFC 9264 Linksets",
-    description: "Locating and parsing standardized RFC 9264 Linksets. Linksets provide a machine-readable map of web links and relations between resources, either embedded within HTML <link> tags, sent via HTTP Link headers with relation=linkset, or hosted as standalone .linkset JSON/text documents. This allows WRX to resolve complex, cross-domain relationship graphs efficiently.",
-    icon: Link2,
-    details: ["RFC 9264 Linksets", "rel=linkset", "Cross-domain Mappings", "JSON-LD Linksets"]
-  },
-  {
-    id: "embedded",
-    title: "4. Embedded RDF",
-    description: "Scrutinizing the raw HTML markup of a resolved web page to discover inline semantic data. WRX extracts rich structured graphs from <script type=\"application/ld+json\"> tags, parses RDFa attributes (property, resource, about) embedded in standard HTML elements, and scans Microdata formats. This is extremely powerful for websites using schema.org to enrich their human-readable pages.",
-    icon: FileCode,
-    details: ["JSON-LD Scripts", "RDFa Attributes", "HTML Microdata", "Schema.org extraction"]
-  },
-  {
-    id: "catalog",
-    title: "5. RFC 9727 API-Catalog",
-    description: "Leveraging RFC 9727 API catalogs for service and schema discovery. When resolving a URI, WRX checks for associated API-Catalog headers or files. This catalog acts as an automated entrypoint describing all available API endpoints, query capabilities, and semantic metadata definitions associated with the site's dataset, offering a structured path to dynamic queries.",
-    icon: Share2,
-    details: ["RFC 9727 API-Catalog", "Service Discovery", "Dynamic API Endpoints", "Hydra Vocabularies"]
-  },
-  {
-    id: "fallback",
-    title: "6. DCAT & Sitemaps Fallback",
-    description: "Our ultimate fallback discovery mechanism. If direct discovery yields no results, WRX searches the domain's root sitemap.xml for structural pathways or queries regional/global DCAT (Data Catalog Vocabulary) portals. By crawling catalog records and distributions, WRX can often find hidden RDF dumps or endpoints that aren't linked on the resource's immediate landing page.",
-    icon: Database,
-    details: ["Sitemaps Crawling", "DCAT Discovery", "Catalog Distribution Mapping", "Opaque Resource Fallbacks"]
-  }
+import {
+  contentNegotiationStrategy,
+  linkHeaderStrategy,
+  htmlSignpostingStrategy,
+  embeddedScriptStrategy,
+  foafStrategy,
+  sameAsStrategy,
+  skosStrategy,
+  rdfCollectionsStrategy,
+  provenanceStrategy,
+  collectionMembershipStrategy,
+  htmlLinksStrategy,
+  rdfaStrategy,
+  microdataStrategy,
+  openGraphStrategy,
+  dublinCoreStrategy,
+  canonicalStrategy,
+  httpLinkRelationsStrategy,
+  paginationStrategy,
+  reverseLinksStrategy,
+  circularGraphsStrategy,
+  linksetStrategy,
+  dcatCatalogStrategy,
+  wellKnownStrategy,
+  resourceMapStrategy,
+  sitemapSignpostingStrategy,
+  rssFeedStrategy,
+  atomFeedStrategy,
+  manifestStrategy,
+  apiDiscoveryStrategy
+} from "../../src/strategies/index";
+
+const ALL_STRATEGIES = [
+  contentNegotiationStrategy,
+  linkHeaderStrategy,
+  htmlSignpostingStrategy,
+  embeddedScriptStrategy,
+  foafStrategy,
+  sameAsStrategy,
+  skosStrategy,
+  rdfCollectionsStrategy,
+  provenanceStrategy,
+  collectionMembershipStrategy,
+  htmlLinksStrategy,
+  rdfaStrategy,
+  microdataStrategy,
+  openGraphStrategy,
+  dublinCoreStrategy,
+  canonicalStrategy,
+  httpLinkRelationsStrategy,
+  paginationStrategy,
+  reverseLinksStrategy,
+  circularGraphsStrategy,
+  linksetStrategy,
+  dcatCatalogStrategy,
+  wellKnownStrategy,
+  resourceMapStrategy,
+  sitemapSignpostingStrategy,
+  rssFeedStrategy,
+  atomFeedStrategy,
+  manifestStrategy,
+  apiDiscoveryStrategy
 ];
+
+const IMPLEMENTED_STRATEGY_IDS = [
+  'content-negotiation',
+  'signposting-link-header',
+  'signposting-html-link',
+  'embedded-script',
+  'linkset',
+  'sitemap-signposting'
+];
+
+const STRATEGY_ICONS: Record<string, any> = {
+  'content-negotiation': Globe,
+  'signposting-link-header': Search,
+  'signposting-html-link': Search,
+  'embedded-script': FileCode,
+  'foaf': Layers,
+  'same-as': Link2,
+  'skos': Layers,
+  'rdf-collections': Database,
+  'provenance': Zap,
+  'collection-membership': Layers,
+  'html-links': Link2,
+  'rdfa': FileCode,
+  'microdata': FileCode,
+  'open-graph': Share2,
+  'dublin-core': FileCode,
+  'canonical': Link2,
+  'http-link-relations': Network,
+  'pagination': ListRestart,
+  'reverse-links': Network,
+  'circular-graphs': Network,
+  'linkset': Link2,
+  'dcat-catalog': Database,
+  'well-known': Globe,
+  'resource-map': Database,
+  'sitemap-signposting': Database,
+  'rss-feed': Share2,
+  'atom-feed': Share2,
+  'manifest': FileCode,
+  'api-discovery': Share2,
+};
+
 
 const RELATIONS = [
   "describedby", "cite-as", "item", "license", "author"
@@ -178,49 +245,6 @@ const BlueBox = ({ scrollOpacity }: { scrollOpacity: any }) => {
   );
 };
 
-const StrategyCard = ({ strategy, index }: { strategy: typeof STRATEGIES[0], index: number, key?: any }) => {
-  const Icon = strategy.icon;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 40 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-100px" }}
-      transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-      className="strategy-card-blueprint p-6 md:p-8 rounded-2xl border border-accent/15 hover:border-accent hover:shadow-2xl hover:shadow-accent/5 transition-all duration-300 flex flex-col md:flex-row gap-6 md:gap-8 items-start group"
-    >
-      {/* Icon and Number */}
-      <div className="flex md:flex-col items-center gap-4 shrink-0">
-        <div className="w-14 h-14 rounded-2xl bg-accent/5 border border-accent/15 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-white transition-all duration-300 shadow-inner">
-          <Icon size={24} strokeWidth={1.5} />
-        </div>
-        <span className="font-mono text-xs font-black tracking-widest text-accent/40 uppercase md:pt-2">
-          Step 0{index + 1}
-        </span>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 space-y-4">
-        <h3 className="text-xl md:text-2xl font-black text-poster-dark group-hover:text-accent transition-colors duration-300">
-          {strategy.title}
-        </h3>
-
-        <p className="text-[#4a5568] leading-relaxed text-sm md:text-base font-medium">
-          {strategy.description}
-        </p>
-
-        {/* Technical Specs/Pills */}
-        <div className="flex flex-wrap gap-2 pt-2 border-t border-accent/5">
-          {strategy.details.map((detail: string) => (
-            <span key={detail} className="px-3 py-1 bg-accent/5 text-[10px] font-mono font-semibold rounded-md border border-accent/10 text-poster-dark/80 group-hover:bg-accent/10 transition-colors duration-300">
-              {detail}
-            </span>
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-};
 
 const ProblemSection = () => {
   return (
@@ -266,25 +290,453 @@ const ProblemSection = () => {
 };
 
 const StrategiesSection = () => {
+  const [selectedStrategy, setSelectedStrategy] = useState<any | null>(null);
+
+  // Group strategies by quadrant
+  const q1 = ALL_STRATEGIES.filter(s => s.quadrant === 1);
+  const q2 = ALL_STRATEGIES.filter(s => s.quadrant === 2);
+  const q3 = ALL_STRATEGIES.filter(s => s.quadrant === 3);
+  const q4 = ALL_STRATEGIES.filter(s => s.quadrant === 4);
+
+  const renderQuadrantCard = (title: string, quadrantNum: number, strategies: any[], desc: string, badgeColor: string) => {
+    return (
+      <div className="strategy-card-blueprint p-6 rounded-2xl flex flex-col justify-between group transition-all hover:border-accent hover:shadow-2xl duration-300">
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <span className="font-sans font-black text-poster-dark/80 text-base uppercase tracking-wider">
+              Q{quadrantNum}: {title}
+            </span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${badgeColor} uppercase tracking-wider`}>
+              {quadrantNum === 1 || quadrantNum === 3 ? "Direct RDF" : "Inferenced"}
+            </span>
+          </div>
+          <p className="text-xs text-poster-dark/60 font-medium mb-6 leading-relaxed">
+            {desc}
+          </p>
+
+          <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+            {strategies.map((s) => {
+              const Icon = STRATEGY_ICONS[s.source] || Search;
+              const isImplemented = IMPLEMENTED_STRATEGY_IDS.includes(s.source);
+              return (
+                <button
+                  key={s.source}
+                  onClick={() => setSelectedStrategy(s)}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg border text-xs font-medium flex items-center justify-between transition-all duration-200 ${
+                    isImplemented
+                      ? "bg-accent/5 hover:bg-accent/10 border-accent/20 text-poster-dark hover:border-accent"
+                      : "bg-poster-bg/50 hover:bg-poster-bg border-dashed border-accent/10 text-poster-dark/60 hover:border-accent/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-1 rounded ${isImplemented ? "bg-accent/10 text-accent" : "bg-poster-dark/5 text-poster-dark/40"}`}>
+                      <Icon size={14} />
+                    </div>
+                    <span className="truncate font-sans font-semibold">{s.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    {isImplemented ? (
+                      <span className="px-1.5 py-0.5 bg-green-500/10 text-green-600 rounded-[4px] text-[9px] font-bold uppercase tracking-wider">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-600 rounded-[4px] text-[9px] font-bold uppercase tracking-wider">
+                        Roadmap
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <section id="solution" className="relative py-24 md:py-32 z-20 max-w-5xl mx-auto px-8 border-t border-accent/10">
+    <section id="solution" className="relative py-24 md:py-32 z-20 max-w-6xl mx-auto px-8 border-t border-accent/10">
       <div className="mb-16">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-8 h-px bg-accent/30" />
-          <span className="text-accent font-black uppercase text-xs tracking-widest block">CASCADING PIPELINE</span>
+          <span className="text-accent font-black uppercase text-xs tracking-widest block">2X2 TAXONOMY MATRIX</span>
         </div>
         <h2 className="text-4xl md:text-5xl font-black text-poster-dark tracking-tighter">
-          Our Discovery Techniques
+          Cascading Discovery Pipeline
         </h2>
-        <p className="text-poster-dark/60 max-w-xl mt-4 font-medium">
-          WRX processes resources by checking each of the following strategies sequentially, cascading automatically until an explorable RDF representation is successfully resolved.
+        <p className="text-poster-dark/60 max-w-2xl mt-4 font-medium">
+          WRX processes resources by checking each discovery technique sequentially, cascading automatically until an explorable RDF representation is successfully resolved. Clicking any technique exposes its specification details.
         </p>
       </div>
 
-      <div className="space-y-8">
-        {STRATEGIES.map((strategy, i) => (
-          <StrategyCard key={strategy.id} strategy={strategy} index={i} />
-        ))}
+      {/* 2x2 Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
+        {/* Quadrant 1 */}
+        {renderQuadrantCard(
+          "Resource-Direct",
+          1,
+          q1,
+          "Natively serialized RDF retrieved directly from the resource URI response headers or page body.",
+          "bg-accent/10 text-accent border border-accent/20"
+        )}
+
+        {/* Quadrant 2 */}
+        {renderQuadrantCard(
+          "Resource-Inferenced",
+          2,
+          q2,
+          "Embedded markup or hyperlinks within the resource page that the client must parse and translate into RDF.",
+          "bg-blue-500/10 text-blue-600 border border-blue-200/20"
+        )}
+
+        {/* Quadrant 3 */}
+        {renderQuadrantCard(
+          "Domain-Direct",
+          3,
+          q3,
+          "Natively serialized RDF datasets hosted at domain-wide endpoints or dynamic catalogs.",
+          "bg-teal-500/10 text-teal-600 border border-teal-200/20"
+        )}
+
+        {/* Quadrant 4 */}
+        {renderQuadrantCard(
+          "Domain-Inferenced",
+          4,
+          q4,
+          "Host-wide XML indices, sitemaps, and feeds that detail resource paths and require translation to RDF.",
+          "bg-indigo-500/10 text-indigo-600 border border-indigo-200/20"
+        )}
+      </div>
+
+      {/* Detail Modal */}
+      <AnimatePresence>
+        {selectedStrategy && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedStrategy(null)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-[4px] z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full border border-accent/20 relative"
+            >
+              {/* Header */}
+              <div className="flex items-start gap-4 mb-6">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                  IMPLEMENTED_STRATEGY_IDS.includes(selectedStrategy.source)
+                    ? "bg-accent/10 text-accent border border-accent/20"
+                    : "bg-poster-dark/5 text-poster-dark/40 border border-poster-dark/10"
+                }`}>
+                  {(() => {
+                    const Icon = STRATEGY_ICONS[selectedStrategy.source] || Search;
+                    return <Icon size={24} />;
+                  })()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-[10px] font-black uppercase tracking-widest text-accent">
+                      Quadrant {selectedStrategy.quadrant}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider ${
+                      IMPLEMENTED_STRATEGY_IDS.includes(selectedStrategy.source)
+                        ? "bg-green-500/10 text-green-600"
+                        : "bg-amber-500/10 text-amber-600"
+                    }`}>
+                      {IMPLEMENTED_STRATEGY_IDS.includes(selectedStrategy.source) ? "Implemented / Active" : "Roadmap / Planned"}
+                    </span>
+                  </div>
+                  <h4 className="font-black text-xl text-poster-dark tracking-tight leading-tight">
+                    {selectedStrategy.label}
+                  </h4>
+                </div>
+              </div>
+
+              {/* Taxonomy Specs */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-poster-bg rounded-xl border border-accent/5 mb-6 text-xs font-semibold">
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-poster-dark/50 mb-1">Location</div>
+                  <div className="text-poster-dark font-bold font-sans flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                    {selectedStrategy.location} Level
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-poster-dark/50 mb-1">Extraction Type</div>
+                  <div className="text-poster-dark font-bold font-sans flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                    {selectedStrategy.extraction} RDF
+                  </div>
+                </div>
+              </div>
+
+              {/* Description & Specs */}
+              <div className="space-y-4 mb-8">
+                <div>
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-[#666] block mb-1">Concept Overview</span>
+                  <p className="text-sm text-[#4a5568] leading-relaxed font-medium">
+                    {selectedStrategy.extraInfo?.replace('TODO: ', '') || "No explanation provided."}
+                  </p>
+                </div>
+
+                {selectedStrategy.standard && (
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-widest text-[#666] block mb-1">Protocol / Standard</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-poster-dark font-bold bg-accent/5 px-2.5 py-1 rounded border border-accent/10">
+                        {selectedStrategy.standard}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex gap-3 pt-4 border-t border-accent/5">
+                {selectedStrategy.specLink && (
+                  <a
+                    href={selectedStrategy.specLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-3 bg-accent hover:opacity-90 transition-opacity text-white text-center text-xs font-bold uppercase tracking-widest rounded-lg flex items-center justify-center gap-2"
+                  >
+                    <BookOpen size={14} /> View Specification <ExternalLink size={10} />
+                  </a>
+                )}
+                <button
+                  onClick={() => setSelectedStrategy(null)}
+                  className="px-6 py-3 border border-[#cbd5e1] hover:bg-poster-bg transition-colors text-poster-dark text-xs font-bold uppercase tracking-widest rounded-lg"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+};
+
+const RoadmapSection = () => {
+  const [activeTab, setActiveTab] = useState<1 | 3 | 2 | 4>(1); // Quadrant rank order: 1 -> 3 -> 2 -> 4
+
+  // Group strategies by quadrant
+  const q1 = ALL_STRATEGIES.filter(s => s.quadrant === 1);
+  const q2 = ALL_STRATEGIES.filter(s => s.quadrant === 2);
+  const q3 = ALL_STRATEGIES.filter(s => s.quadrant === 3);
+  const q4 = ALL_STRATEGIES.filter(s => s.quadrant === 4);
+
+  // Count implemented per quadrant
+  const countImplemented = (strategies: any[]) =>
+    strategies.filter(s => IMPLEMENTED_STRATEGY_IDS.includes(s.source)).length;
+
+  const q1Imp = countImplemented(q1);
+  const q2Imp = countImplemented(q2);
+  const q3Imp = countImplemented(q3);
+  const q4Imp = countImplemented(q4);
+
+  const totalImplemented = q1Imp + q2Imp + q3Imp + q4Imp;
+  const totalStrategies = ALL_STRATEGIES.length;
+  const percentage = Math.round((totalImplemented / totalStrategies) * 100);
+
+  const quadrants = [
+    { id: 1 as const, name: "Resource-Direct", rank: 1, count: q1.length, imp: q1Imp, color: "accent", strategies: q1, desc: "Direct RDF payloads served on the resource URI." },
+    { id: 3 as const, name: "Domain-Direct", rank: 2, count: q3.length, imp: q3Imp, color: "teal-500", strategies: q3, desc: "Direct RDF catalogs hosted at host-wide entrypoints." },
+    { id: 2 as const, name: "Resource-Inferenced", rank: 3, count: q2.length, imp: q2Imp, color: "blue-500", strategies: q2, desc: "Embedded page structures requiring client translation to RDF." },
+    { id: 4 as const, name: "Domain-Inferenced", rank: 4, count: q4.length, imp: q4Imp, color: "indigo-500", strategies: q4, desc: "Domain XML indices and feeds describing resource locations." }
+  ];
+
+  const activeQuad = quadrants.find(q => q.id === activeTab)!;
+
+  return (
+    <section id="roadmap" className="relative py-24 md:py-32 z-20 max-w-6xl mx-auto px-8 border-t border-accent/10">
+      <div className="mb-16">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-px bg-accent/30" />
+          <span className="text-accent font-black uppercase text-xs tracking-widest block">DEVELOPMENT ROADMAP</span>
+        </div>
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-8">
+          <div>
+            <h2 className="text-4xl md:text-5xl font-black text-poster-dark tracking-tighter">
+              Implementation Roadmap
+            </h2>
+            <p className="text-poster-dark/60 max-w-xl mt-4 font-medium">
+              Tracking the completeness of the WRX discovery engine. Quadrants are prioritized by their semantic confidence ranking (Resource-Direct first, Domain-Inferenced last).
+            </p>
+          </div>
+
+          {/* Progress Circle or Bar */}
+          <div className="flex items-center gap-6 p-6 bg-white border border-accent/15 rounded-2xl shadow-sm shrink-0">
+            {/* Progress Bar or Ring */}
+            <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                <path
+                  className="text-accent/10"
+                  strokeWidth="3"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="text-accent"
+                  strokeDasharray={`${percentage}, 100`}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <div className="absolute font-sans font-black text-sm text-poster-dark">
+                {percentage}%
+              </div>
+            </div>
+            <div>
+              <div className="font-sans font-black text-base text-poster-dark">
+                {totalImplemented} / {totalStrategies}
+              </div>
+              <div className="text-[10px] uppercase font-mono tracking-widest text-poster-dark/50">
+                Strategies Active
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quadrant Progress Dashboard */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+        {quadrants.map((q) => {
+          const isSelected = activeTab === q.id;
+          const qPercent = Math.round((q.imp / q.count) * 100);
+          return (
+            <button
+              key={q.id}
+              onClick={() => setActiveTab(q.id)}
+              className={`p-5 rounded-2xl text-left border transition-all duration-300 ${
+                isSelected
+                  ? "bg-white border-accent shadow-lg shadow-accent/5 ring-1 ring-accent/10 scale-[1.02]"
+                  : "bg-white/40 border-accent/10 hover:border-accent/30 hover:bg-white/70"
+              }`}
+            >
+              <div className="text-[9px] font-mono font-black uppercase tracking-wider text-poster-dark/40 mb-1 flex items-center justify-between">
+                <span>Rank {q.rank}</span>
+                <span>Q{q.id}</span>
+              </div>
+              <h4 className="font-black text-sm text-poster-dark truncate mb-3">
+                {q.name}
+              </h4>
+              <div className="w-full bg-poster-dark/5 rounded-full h-1.5 mb-2 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    q.id === 1 ? "bg-accent" : q.id === 3 ? "bg-teal-500" : q.id === 2 ? "bg-blue-500" : "bg-indigo-500"
+                  }`}
+                  style={{ width: `${qPercent}%` }}
+                />
+              </div>
+              <div className="flex justify-between items-center text-[10px] font-bold text-poster-dark/70">
+                <span>{q.imp} / {q.count} Active</span>
+                <span>{qPercent}%</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Content / Interactive Timeline */}
+      <div className="strategy-card-blueprint rounded-3xl overflow-hidden border border-accent/15 bg-white p-6 md:p-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-accent/5 pb-6 mb-8 gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-accent">
+                Quadrant {activeQuad.id} Mappings
+              </span>
+              <span className="px-2 py-0.5 bg-accent/5 border border-accent/10 rounded text-[9px] font-mono font-bold text-accent uppercase tracking-wider">
+                Rank {activeQuad.rank} Priority
+              </span>
+            </div>
+            <h3 className="text-xl font-black text-poster-dark tracking-tight">
+              {activeQuad.name} Phase
+            </h3>
+            <p className="text-xs text-poster-dark/50 font-medium mt-1">
+              {activeQuad.desc}
+            </p>
+          </div>
+
+          <div className="text-[11px] font-bold text-poster-dark/60 font-mono">
+            {activeQuad.imp} of {activeQuad.count} techniques completed
+          </div>
+        </div>
+
+        {/* Timeline List */}
+        <div className="relative border-l-2 border-accent/10 ml-3 pl-6 md:pl-8 space-y-8 py-2">
+          {activeQuad.strategies.map((s) => {
+            const isImplemented = IMPLEMENTED_STRATEGY_IDS.includes(s.source);
+            const Icon = STRATEGY_ICONS[s.source] || Search;
+            return (
+              <div key={s.source} className="relative group">
+                {/* Connector Dot */}
+                <div className={`absolute -left-[33px] md:-left-[41px] top-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors duration-300 ${
+                  isImplemented
+                    ? "bg-white border-green-500 text-green-500"
+                    : "bg-white border-amber-500/40 text-amber-500/40 group-hover:border-amber-500"
+                }`}>
+                  {isImplemented ? <Check size={10} strokeWidth={3} /> : <Clock size={10} />}
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8 justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1 rounded ${isImplemented ? "bg-green-50 text-green-600" : "bg-amber-50/50 text-amber-600/60"}`}>
+                        <Icon size={14} />
+                      </div>
+                      <h4 className={`text-base font-black tracking-tight ${isImplemented ? "text-poster-dark" : "text-poster-dark/50"}`}>
+                        {s.label}
+                      </h4>
+                      {isImplemented ? (
+                        <span className="px-2 py-0.5 bg-green-500/10 text-green-600 rounded text-[9px] font-bold uppercase tracking-wider">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 rounded text-[9px] font-bold uppercase tracking-wider">
+                          Planned
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-[#4a5568]/80 leading-relaxed font-medium pl-0.5">
+                      {s.extraInfo?.replace('TODO: ', '') || "Concept explanation details."}
+                    </p>
+                  </div>
+
+                  {/* Specification info */}
+                  {s.standard && (
+                    <div className="shrink-0 flex flex-col items-start md:items-end gap-1.5 mt-1">
+                      <span className="text-[9px] uppercase tracking-wider font-mono text-poster-dark/40">Specification</span>
+                      {s.specLink ? (
+                        <a
+                          href={s.specLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 bg-accent/5 hover:bg-accent/10 border border-accent/10 rounded font-sans text-[11px] font-bold text-accent transition-colors flex items-center gap-1.5"
+                        >
+                          {s.standard} <ExternalLink size={10} />
+                        </a>
+                      ) : (
+                        <span className="px-2.5 py-1 bg-poster-dark/5 border border-poster-dark/10 rounded font-sans text-[11px] font-bold text-poster-dark/60">
+                          {s.standard}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
@@ -1039,8 +1491,10 @@ export default function App() {
       {/* Problem Section */}
       <ProblemSection />
 
-      {/* Strategies Section */}
       <StrategiesSection />
+
+      {/* Roadmap Section */}
+      <RoadmapSection />
 
       {/* Result Section */}
       <section className="relative py-24 md:py-32 w-full flex items-center justify-center z-40 bg-poster-bg border-t border-accent/10">
