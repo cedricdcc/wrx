@@ -1,6 +1,6 @@
-import type { ExtractedRDF } from '../core/types'
-import type { StrategyContext, DiscoveryStrategy } from './strategy-interface'
-import { isRDFMime } from '../core/utils'
+import type { ExtractedRDF } from '../../../core/types'
+import type { StrategyContext, DiscoveryStrategy } from '../../strategy-interface'
+import { isRDFMime } from '../../../core/utils'
 
 /**
  * Embedded RDF Script Strategy
@@ -14,6 +14,12 @@ import { isRDFMime } from '../core/utils'
 export class EmbeddedScriptStrategy implements DiscoveryStrategy {
   readonly label = 'Embedded RDF script'
   readonly source: ExtractedRDF['source'] = 'embedded-script'
+  readonly location = 'Resource' as const
+  readonly extraction = 'Direct' as const
+  readonly quadrant = 1 as const
+  readonly specLink = 'https://www.w3.org/TR/json-ld11/'
+  readonly standard = 'JSON-LD 1.1 Specification'
+  readonly extraInfo = 'Extracts inline semantic data from <script type="application/ld+json"> or <script type="text/turtle"> tags.'
 
   /**
    * Single-hit mode: return the first embedded RDF script found.

@@ -1,10 +1,10 @@
-import type { ExtractedRDF } from '../core/types'
-import type { StrategyContext, DiscoveryStrategy } from './strategy-interface'
-import { fetchWithRedirect, fetchRDF, fetchDescribedBy } from '../core/fetch'
-import { baseMime, normUri, isRDFMime, isLinksetMime } from '../core/utils'
-import { resolveRdfFormat } from '../core/mime'
-import { hasNonEmptyProfileAttribute, shouldAcceptDeclaredType } from '../core/signposting'
-import { parseLinkHeader } from '../core/link-parser'
+import type { ExtractedRDF } from '../../../core/types'
+import type { StrategyContext, DiscoveryStrategy } from '../../strategy-interface'
+import { fetchWithRedirect, fetchRDF, fetchDescribedBy } from '../../../core/fetch'
+import { baseMime, normUri, isRDFMime, isLinksetMime } from '../../../core/utils'
+import { resolveRdfFormat } from '../../../core/mime'
+import { hasNonEmptyProfileAttribute, shouldAcceptDeclaredType } from '../../../core/signposting'
+import { parseLinkHeader } from '../../../core/link-parser'
 
 /**
  * Linkset Strategy (RFC 9264)
@@ -26,6 +26,12 @@ import { parseLinkHeader } from '../core/link-parser'
 export class LinksetStrategy implements DiscoveryStrategy {
   readonly label = 'RFC 9264 Linkset'
   readonly source: ExtractedRDF['source'] = 'linkset'
+  readonly location = 'Domain' as const
+  readonly extraction = 'Direct' as const
+  readonly quadrant = 3 as const
+  readonly specLink = 'https://datatracker.ietf.org/doc/html/rfc9264'
+  readonly standard = 'RFC 9264 (Linksets)'
+  readonly extraInfo = 'Locates and parses standardized RFC 9264 Linksets (JSON or plain-text representation of link relations).'
 
   /**
    * Single-hit mode: return the first RDF match found in linkset entries.

@@ -58,12 +58,40 @@ export interface ParsedCliArgs {
   input?: string
   output?: string
   profile?: boolean
+  report?: boolean
 }
 
 export type StrategyName =
+  // Quadrant 1
   | 'content-negotiation'
-  | 'link-header'
+  | 'signposting-link-header'
+  | 'signposting-html-link'
+  | 'embedded-script'
+  | 'foaf'
+  | 'same-as'
+  | 'skos'
+  | 'rdf-collections'
+  | 'provenance'
+  | 'collection-membership'
+  // Quadrant 2
+  | 'html-links'
+  | 'rdfa'
+  | 'microdata'
+  | 'open-graph'
+  | 'dublin-core'
+  | 'canonical'
+  | 'http-link-relations'
+  | 'pagination'
+  | 'reverse-links'
+  | 'circular-graphs'
+  // Quadrant 3
   | 'linkset'
-  | 'html-signposting'
-  | 'embedded-rdf'
-  | 'sitemap'
+  | 'dcat-catalog'
+  | 'well-known'
+  | 'resource-map'
+  // Quadrant 4
+  | 'sitemap-signposting'
+  | 'rss-feed'
+  | 'atom-feed'
+  | 'manifest'
+  | 'api-discovery'

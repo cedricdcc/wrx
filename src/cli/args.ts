@@ -7,6 +7,7 @@ Options:
   --all                Explore all extraction strategies
   --extend-links       Print modeled link relations
   --profile            Print discovered profile URIs
+  --report             Print the discovery trace in a tabular format
   -o, --output <path>  Write extracted RDF to a file
 
 Examples:
@@ -24,6 +25,7 @@ export function parseCliArgs(args: string[]): ParsedCliArgs {
   let help = false;
   let output: string | undefined;
   let profile = false;
+  let report = false;
   let input: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -45,6 +47,10 @@ export function parseCliArgs(args: string[]): ParsedCliArgs {
       profile = true;
       continue;
     }
+    if (arg === '--report') {
+      report = true;
+      continue;
+    }
     if (arg === '--output' || arg === '-o') {
       const next = args[index + 1];
       if (!next || next.startsWith('-')) {
@@ -64,5 +70,5 @@ export function parseCliArgs(args: string[]): ParsedCliArgs {
     throw new Error(`Unexpected extra positional argument: ${arg}`);
   }
 
-  return { all, extendLinks, help, input, output, profile };
+  return { all, extendLinks, help, input, output, profile, report };
 }

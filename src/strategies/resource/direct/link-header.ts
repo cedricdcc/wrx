@@ -1,9 +1,9 @@
-import type { ExtractedRDF } from '../core/types'
-import type { StrategyContext, DiscoveryStrategy } from './strategy-interface'
-import { parseLinkHeader } from '../core/link-parser'
-import { fetchRDF } from '../core/fetch'
-import { baseMime, isRDFMime, normUri, isLinksetMime } from '../core/utils'
-import { resolveRdfFormat } from '../core/mime'
+import type { ExtractedRDF } from '../../../core/types'
+import type { StrategyContext, DiscoveryStrategy } from '../../strategy-interface'
+import { parseLinkHeader } from '../../../core/link-parser'
+import { fetchRDF } from '../../../core/fetch'
+import { baseMime, isRDFMime, normUri, isLinksetMime } from '../../../core/utils'
+import { resolveRdfFormat } from '../../../core/mime'
 
 function hasDeclaredProfile(link: { [key: string]: string }): boolean {
   return Boolean((link['profile'] ?? '').trim())
@@ -32,6 +32,12 @@ function shouldTryDescribedBy(link: { [key: string]: string }): boolean {
 export class LinkHeaderStrategy implements DiscoveryStrategy {
   readonly label = 'HTTP Link header (rel=describedby)'
   readonly source: ExtractedRDF['source'] = 'signposting-link-header'
+  readonly location = 'Resource' as const
+  readonly extraction = 'Direct' as const
+  readonly quadrant = 1 as const
+  readonly specLink = 'https://datatracker.ietf.org/doc/html/rfc8288'
+  readonly standard = 'RFC 8288 (Web Linking)'
+  readonly extraInfo = 'Inspecting HTTP response headers for explicit rel=describedby/profile relations pointing to native RDF metadata.'
 
   /**
    * Single-hit mode: return the first describedby link that resolves to RDF.

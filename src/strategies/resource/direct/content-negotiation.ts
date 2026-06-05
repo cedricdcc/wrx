@@ -1,8 +1,8 @@
-import type { ExtractedRDF, ContentNegotiationResult } from '../core/types'
-import type { StrategyContext, DiscoveryStrategy } from './strategy-interface'
-import { fetchRDF, fetchWithRedirect } from '../core/fetch'
-import { baseMime, isRDFMime } from '../core/utils'
-import { RDF_MIMES } from '../core/constants'
+import type { ExtractedRDF, ContentNegotiationResult } from '../../../core/types'
+import type { StrategyContext, DiscoveryStrategy } from '../../strategy-interface'
+import { fetchRDF, fetchWithRedirect } from '../../../core/fetch'
+import { baseMime, isRDFMime } from '../../../core/utils'
+import { RDF_MIMES } from '../../../core/constants'
 
 /**
  * Content Negotiation Strategy (RFC 7231 §5.3.2)
@@ -17,6 +17,12 @@ import { RDF_MIMES } from '../core/constants'
 export class ContentNegotiationStrategy implements DiscoveryStrategy {
   readonly label = 'Content Negotiation'
   readonly source: ExtractedRDF['source'] = 'content-negotiation'
+  readonly location = 'Resource' as const
+  readonly extraction = 'Direct' as const
+  readonly quadrant = 1 as const
+  readonly specLink = 'https://www.w3.org/Protocols/rfc2616/rfc2616-sec12.html'
+  readonly standard = 'RFC 2616 Content Negotiation'
+  readonly extraInfo = 'Negotiating directly with the server by sending targeted Accept headers for RDF serializations.'
 
   /**
    * Single-hit mode: return the first RDF match found.

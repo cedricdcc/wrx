@@ -57,4 +57,12 @@ export interface DiscoveryStrategy {
    * Example: "content-negotiation", "signposting-link-header", "linkset"
    */
   readonly source: ExtractedRDF['source']
+
+  /** Taxonomy categorization metadata */
+  readonly location: 'Resource' | 'Domain' | 'Both'
+  readonly extraction: 'Direct' | 'Inferenced' | 'Both'
+  readonly quadrant: 1 | 2 | 3 | 4
+  readonly specLink?: string
+  readonly standard?: string
+  readonly extraInfo?: string
 }

@@ -5,13 +5,70 @@ import { baseMime, isRDFMime, normUri } from '../core/utils'
 import { extractHtmlHints } from '../core/html-parser'
 import { parseLinkHeader } from '../core/link-parser'
 import {
+  contentNegotiationStrategy,
   linkHeaderStrategy,
-  linksetStrategy,
   htmlSignpostingStrategy,
   embeddedScriptStrategy,
+  foafStrategy,
+  sameAsStrategy,
+  skosStrategy,
+  rdfCollectionsStrategy,
+  provenanceStrategy,
+  collectionMembershipStrategy,
+  htmlLinksStrategy,
+  rdfaStrategy,
+  microdataStrategy,
+  openGraphStrategy,
+  dublinCoreStrategy,
+  canonicalStrategy,
+  httpLinkRelationsStrategy,
+  paginationStrategy,
+  reverseLinksStrategy,
+  circularGraphsStrategy,
+  linksetStrategy,
+  dcatCatalogStrategy,
+  wellKnownStrategy,
+  resourceMapStrategy,
   sitemapSignpostingStrategy,
+  rssFeedStrategy,
+  atomFeedStrategy,
+  manifestStrategy,
+  apiDiscoveryStrategy,
   type StrategyContext,
+  type DiscoveryStrategy,
 } from './index'
+
+const STRATEGY_MAP: Record<string, DiscoveryStrategy> = {
+  'content-negotiation': contentNegotiationStrategy,
+  'signposting-link-header': linkHeaderStrategy,
+  'signposting-html-link': htmlSignpostingStrategy,
+  'embedded-script': embeddedScriptStrategy,
+  'foaf': foafStrategy,
+  'same-as': sameAsStrategy,
+  'skos': skosStrategy,
+  'rdf-collections': rdfCollectionsStrategy,
+  'provenance': provenanceStrategy,
+  'collection-membership': collectionMembershipStrategy,
+  'html-links': htmlLinksStrategy,
+  'rdfa': rdfaStrategy,
+  'microdata': microdataStrategy,
+  'open-graph': openGraphStrategy,
+  'dublin-core': dublinCoreStrategy,
+  'canonical': canonicalStrategy,
+  'http-link-relations': httpLinkRelationsStrategy,
+  'pagination': paginationStrategy,
+  'reverse-links': reverseLinksStrategy,
+  'circular-graphs': circularGraphsStrategy,
+  'linkset': linksetStrategy,
+  'dcat-catalog': dcatCatalogStrategy,
+  'well-known': wellKnownStrategy,
+  'resource-map': resourceMapStrategy,
+  'sitemap-signposting': sitemapSignpostingStrategy,
+  'rss-feed': rssFeedStrategy,
+  'atom-feed': atomFeedStrategy,
+  'manifest': manifestStrategy,
+  'api-discovery': apiDiscoveryStrategy,
+}
 
 export interface ContentNegotiationProbe {
   requestedMime: string
@@ -26,6 +83,9 @@ export interface StrategyTraceStep {
   strategy: number
   source: ExtractedRDF['source']
   label: string
+  quadrant: number
+  standard: string
+  extraInfo: string
   found: boolean
   hits: Array<{
     format: string
@@ -113,7 +173,7 @@ async function buildStrategyContext(uri: string, allowHtmlFallbackAfterInitialRd
     initialMime,
     initialOk,
     initialBody,
-  }
+  } as StrategyContext
 }
 
 function collectLinksetCandidates(uri: string, bodyText: string, linkHeader: string | null): string[] {
@@ -175,31 +235,51 @@ export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null
 
   const ctx = await buildStrategyContext(uri, false)
 
-  if (ctx.initialOk && isRDFMime(ctx.initialMime)) {
+  const ctxAny = ctx as any
+  if (ctxAny.initialOk && isRDFMime(ctxAny.initialMime)) {
     return {
-      content: ctx.initialBody,
-      mime: ctx.initialMime,
-      format: ctx.initialMime as ExtractedRDF['format'],
+      content: ctxAny.initialBody,
+      mime: ctxAny.initialMime,
+      format: ctxAny.initialMime as ExtractedRDF['format'],
       source: 'content-negotiation',
       url: uri,
+      uri,
     } as ExtractedRDF
   }
 
-  const headerHit = await linkHeaderStrategy.executeFirstHit(ctx)
-  if (headerHit) return headerHit
+  // Iterate over STRATEGY_ORDER to try each strategy in order
+  for (const source of STRATEGY_ORDER) {
+    const strat = STRATEGY_MAP[source]
+    if (!strat) continue
 
-  const htmlHit = await htmlSignpostingStrategy.executeFirstHit(ctx)
-  if (htmlHit) return htmlHit
+    // content-negotiation is already handled as initial fetch above,
+    // but we can let it run if it's there
+    if (source === 'content-negotiation') continue
 
-  const embeddedHit = await embeddedScriptStrategy.executeFirstHit(ctx)
-  if (embeddedHit) return embeddedHit
+    // For linkset, it might need to try multiple candidate URLs (headers + html)
+    if (source === 'linkset') {
+      for (const linksetUrl of collectLinksetCandidates(uri, ctx.bodyText, ctx.linkHeader)) {
+        const linksetHit = await linksetStrategy.executeFirstHit({ ...ctx, linksetUrl })
+        if (linksetHit) {
+          linksetHit.uri = uri
+          return linksetHit
+        }
+      }
+      continue
+    }
 
-  for (const linksetUrl of collectLinksetCandidates(uri, ctx.bodyText, ctx.linkHeader)) {
-    const linksetHit = await linksetStrategy.executeFirstHit({ ...ctx, linksetUrl })
-    if (linksetHit) return linksetHit
+    try {
+      const hit = await strat.executeFirstHit(ctx)
+      if (hit) {
+        hit.uri = uri
+        return hit
+      }
+    } catch {
+      // Ignore and continue
+    }
   }
 
-  return sitemapSignpostingStrategy.executeFirstHit(ctx)
+  return null
 }
 
 export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
@@ -220,6 +300,7 @@ export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
           format: probe.responseMime as ExtractedRDF['format'],
           source: 'content-negotiation',
           url: uri,
+          uri,
         } as ExtractedRDF)
       }
     }
@@ -230,69 +311,54 @@ export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
     notFound.push('content-negotiation')
   }
 
-  // Strategy 2: HTTP Link headers
-  const headerHits = await linkHeaderStrategy.executeAllHits(ctx)
-  if (headerHits.length > 0) {
-    found.push(...headerHits)
-  } else {
-    notFound.push('signposting-link-header')
-  }
+  // Run the remaining strategies in order
+  for (const source of STRATEGY_ORDER) {
+    if (source === 'content-negotiation') continue
 
-  // Strategy 3: linkset candidates discovered from headers and HTML
-  const linksetCandidates = collectLinksetCandidates(uri, ctx.bodyText, ctx.linkHeader)
-  let linksetHits: ExtractedRDF[] = []
-  for (const linksetUrl of linksetCandidates) {
-    const hits = await linksetStrategy.executeAllHits({ ...ctx, linksetUrl })
-    if (hits.length > 0) {
-      linksetHits.push(...hits)
+    const strat = STRATEGY_MAP[source]
+    if (!strat) continue
+
+    if (source === 'linkset') {
+      const linksetCandidates = collectLinksetCandidates(uri, ctx.bodyText, ctx.linkHeader)
+      let linksetHits: ExtractedRDF[] = []
+      for (const linksetUrl of linksetCandidates) {
+        const hits = await linksetStrategy.executeAllHits({ ...ctx, linksetUrl })
+        if (hits.length > 0) {
+          linksetHits.push(...hits)
+        }
+      }
+      if (linksetHits.length > 0) {
+        linksetHits.forEach(h => h.uri = uri)
+        found.push(...linksetHits)
+      } else {
+        notFound.push('linkset')
+      }
+      continue
     }
-  }
-  if (linksetHits.length > 0) {
-    found.push(...linksetHits)
-  } else {
-    notFound.push('linkset')
-  }
 
-  // Strategy 4: HTML describedby links
-  const htmlHits = await htmlSignpostingStrategy.executeAllHits(ctx)
-  if (htmlHits.length > 0) {
-    found.push(...htmlHits)
-  } else {
-    notFound.push('signposting-html-link')
-  }
-
-  // Strategy 5: embedded RDF scripts
-  const embeddedHits = await embeddedScriptStrategy.executeAllHits(ctx)
-  if (embeddedHits.length > 0) {
-    found.push(...embeddedHits)
-  } else {
-    notFound.push('embedded-script')
-  }
-
-  // Strategy 6: sitemap fallback
-  const sitemapHits = await sitemapSignpostingStrategy.executeAllHits(ctx)
-  if (sitemapHits.length > 0) {
-    found.push(...sitemapHits)
-  } else {
-    notFound.push('sitemap-signposting')
+    try {
+      const hits = await strat.executeAllHits(ctx)
+      if (hits.length > 0) {
+        hits.forEach(h => h.uri = uri)
+        found.push(...hits)
+      } else {
+        notFound.push(source)
+      }
+    } catch {
+      notFound.push(source)
+    }
   }
 
   const trace: StrategyTraceStep[] = STRATEGY_ORDER.map((source, i) => {
     const hits = found.filter((item) => item.source === source)
+    const strat = STRATEGY_MAP[source]
     return {
       strategy: i + 1,
       source,
-      label: source === 'content-negotiation'
-        ? 'Content Negotiation'
-        : source === 'signposting-link-header'
-          ? 'HTTP Link header (rel=describedby)'
-          : source === 'linkset'
-            ? 'Linkset (rel=linkset)'
-            : source === 'signposting-html-link'
-              ? 'HTML link[rel=describedby]'
-              : source === 'embedded-script'
-                ? 'Embedded RDF script'
-                : 'Sitemap signposting (robots.txt)',
+      label: strat ? strat.label : source,
+      quadrant: strat ? strat.quadrant : 1,
+      standard: strat?.standard || '',
+      extraInfo: strat?.extraInfo || '',
       found: hits.length > 0,
       hits: hits.map((hit) => ({
         format: hit.format,

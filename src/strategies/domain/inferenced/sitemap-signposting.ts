@@ -1,10 +1,10 @@
-import type { ExtractedRDF } from '../core/types'
-import type { StrategyContext, DiscoveryStrategy } from './strategy-interface'
-import { fetchWithRedirect, fetchRDF } from '../core/fetch'
-import { baseMime, splitRelValues } from '../core/utils'
-import { resolveRdfFormat } from '../core/mime'
-import { parseTagAttributes } from '../core/html-parser'
-import { hasNonEmptyProfileAttribute, shouldAcceptDeclaredType } from '../core/signposting'
+import type { ExtractedRDF } from '../../../core/types'
+import type { StrategyContext, DiscoveryStrategy } from '../../strategy-interface'
+import { fetchWithRedirect, fetchRDF } from '../../../core/fetch'
+import { baseMime, splitRelValues } from '../../../core/utils'
+import { resolveRdfFormat } from '../../../core/mime'
+import { parseTagAttributes } from '../../../core/html-parser'
+import { hasNonEmptyProfileAttribute, shouldAcceptDeclaredType } from '../../../core/signposting'
 
 interface SitemapLinkNamespace {
   namespaceUri: string
@@ -131,6 +131,12 @@ function parseSitemapEntriesFallback(xmlText: string): SitemapEntry[] {
 export class SitemapSignpostingStrategy implements DiscoveryStrategy {
   readonly label = 'Sitemap signposting'
   readonly source: ExtractedRDF['source'] = 'sitemap-signposting'
+  readonly location = 'Domain' as const
+  readonly extraction = 'Inferenced' as const
+  readonly quadrant = 4 as const
+  readonly specLink = 'https://www.sitemaps.org/protocol.html'
+  readonly standard = 'XML Sitemaps & robots.txt'
+  readonly extraInfo = 'Traverses domain-wide robots.txt and sitemap.xml to locate resource paths and metadata.'
 
   /**
    * Single-hit mode: return the first RDF found via sitemap signposting.

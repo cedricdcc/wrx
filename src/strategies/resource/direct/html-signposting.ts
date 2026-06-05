@@ -1,8 +1,8 @@
-import type { ExtractedRDF } from '../core/types'
-import type { StrategyContext, DiscoveryStrategy } from './strategy-interface'
-import { fetchRDF } from '../core/fetch'
-import { baseMime, isRDFMime, relHasToken } from '../core/utils'
-import { resolveRdfFormat } from '../core/mime'
+import type { ExtractedRDF } from '../../../core/types'
+import type { StrategyContext, DiscoveryStrategy } from '../../strategy-interface'
+import { fetchRDF } from '../../../core/fetch'
+import { baseMime, isRDFMime, relHasToken } from '../../../core/utils'
+import { resolveRdfFormat } from '../../../core/mime'
 
 /**
  * HTML Signposting Strategy (FAIR signposting)
@@ -20,6 +20,12 @@ import { resolveRdfFormat } from '../core/mime'
 export class HtmlSignpostingStrategy implements DiscoveryStrategy {
   readonly label = 'HTML link[rel=describedby]'
   readonly source: ExtractedRDF['source'] = 'signposting-html-link'
+  readonly location = 'Resource' as const
+  readonly extraction = 'Direct' as const
+  readonly quadrant = 1 as const
+  readonly specLink = 'https://datatracker.ietf.org/doc/html/rfc8288#section-3'
+  readonly standard = 'RFC 8288 (Web Linking) - Section 3'
+  readonly extraInfo = 'Extracts RDF by discovering link[rel=describedby] elements in HTML documents pointing directly to RDF descriptions.'
 
   /**
    * Single-hit mode: return the first HTML describedby link that resolves to RDF.
