@@ -29,7 +29,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import KnowledgeGraph from "./components/KnowledgeGraph";
-import { extractRDF, extractLinkRelations } from "wrx";
+import CascadeVisualizerHUD from "./components/CascadeVisualizerHUD";
+import { extractRDF, extractLinkRelations, extractAllRDF } from "wrx";
 import * as N3 from "n3";
 import { QueryEngine } from "@comunica/query-sparql-rdfjs";
 import jsonld from "jsonld";
@@ -860,12 +861,62 @@ const TryOutSection = () => {
   const [querying, setQuerying] = useState(false);
   const [sparqlError, setSparqlError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'graph' | 'sparql' | 'triples'>('graph');
+  const [activeTab, setActiveTab] = useState<'graph' | 'sparql' | 'triples' | 'report'>('report');
   const [selectedUri, setSelectedUri] = useState<string | null>(null);
   const [showUriActions, setShowUriActions] = useState(false);
 
   const [triplesAddedFeedback, setTriplesAddedFeedback] = useState<{ count: number, show: boolean }>({ count: 0, show: false });
   const [extendLinks, setExtendLinks] = useState(true);
+
+  // Report & Trace States
+  const [traceSteps, setTraceSteps] = useState<any[]>([]);
+  const [strategyTriples, setStrategyTriples] = useState<Record<string, any[]>>({});
+  const [selectedReportStrategy, setSelectedReportStrategy] = useState<any | null>(null);
+
+  const parseRdfToTriples = async (contentStr: string, format: string, url: string): Promise<any[]> => {
+    const triples: any[] = [];
+    try {
+      const lowerFormat = (format || '').toLowerCase();
+      if (lowerFormat.includes('json') && lowerFormat.includes('ld')) {
+        const json = JSON.parse(contentStr);
+        const nquads = await jsonld.toRDF(json, { format: 'application/n-quads' });
+        const parser = new N3.Parser({ format: 'N-Quads', baseIRI: url });
+        const quads = parser.parse(nquads as string);
+        quads.forEach(quad => {
+          let datatype = '';
+          if (quad.object.termType === 'Literal') {
+            datatype = quad.object.datatype.value;
+          }
+          triples.push({
+            subject: quad.subject.value,
+            predicate: quad.predicate.value,
+            object: quad.object.value,
+            objectType: quad.object.termType,
+            datatype: datatype
+          });
+        });
+      } else {
+        const parser = new N3.Parser({ baseIRI: url });
+        const quads = parser.parse(contentStr);
+        quads.forEach(quad => {
+          let datatype = '';
+          if (quad.object.termType === 'Literal') {
+            datatype = quad.object.datatype.value;
+          }
+          triples.push({
+            subject: quad.subject.value,
+            predicate: quad.predicate.value,
+            object: quad.object.value,
+            objectType: quad.object.termType,
+            datatype: datatype
+          });
+        });
+      }
+    } catch (e) {
+      console.error(`Parsing failed for format ${format}:`, e);
+    }
+    return triples;
+  };
 
   const handleExtract = async (e?: any, targetUri?: string, append: boolean = false) => {
     if (e) e.preventDefault();
@@ -880,82 +931,57 @@ const TryOutSection = () => {
 
     try {
       // Direct client-side RDF extraction using WRX
-      const [wrxResult, linkRelations] = await Promise.all([
-        extractRDF(uriToFetch).catch(() => null),
+      const [allRdfResult, linkRelations] = await Promise.all([
+        extractAllRDF(uriToFetch).catch(() => null),
         extendLinks ? extractLinkRelations(uriToFetch).catch(err => {
           console.error("Failed to extract link relations:", err);
           return [];
         }) : Promise.resolve([])
       ]);
       
-      const hasRdf = !!(wrxResult && wrxResult.content);
+      const overview = allRdfResult as any;
+      const hasRdf = !!(overview && overview.found && overview.found.length > 0);
       const hasLinks = !!(linkRelations && linkRelations.length > 0);
 
       if (!hasRdf && !hasLinks) {
         throw new Error("No RDF content or web-link relations found");
       }
 
-      let triples: any[] = [];
-      let parsed = false;
-      let contentStr = "";
-      let format = "";
-      let source = "";
-      let url = uriToFetch;
+      // Track triples per strategy
+      const triplesMap: Record<string, any[]> = {};
+      let allMergedTriples: any[] = [];
+      let primaryRawContent = "";
+      let primarySource = "";
+      let primaryFormat = "";
+      let primaryUrl = uriToFetch;
 
-      if (hasRdf && wrxResult) {
-        contentStr = typeof wrxResult.content === 'string' 
-          ? wrxResult.content 
-          : JSON.stringify(wrxResult.content);
-        format = (wrxResult.format || '').toLowerCase();
-        source = wrxResult.source || 'Content Negotiation';
-        url = wrxResult.url || uriToFetch;
-
-        try {
-          if (format.includes('json') && format.includes('ld')) {
-            // JSON-LD support
-            const json = JSON.parse(contentStr);
-            const nquads = await jsonld.toRDF(json, { format: 'application/n-quads' });
-            const parser = new N3.Parser({ format: 'N-Quads', baseIRI: url });
-            const quads = parser.parse(nquads as string);
-            quads.forEach(quad => {
-              let datatype = '';
-              if (quad.object.termType === 'Literal') {
-                datatype = quad.object.datatype.value;
-              }
-              triples.push({
-                subject: quad.subject.value,
-                predicate: quad.predicate.value,
-                object: quad.object.value,
-                objectType: quad.object.termType,
-                datatype: datatype
-              });
-            });
-            parsed = true;
-          } else {
-            // Try N3 parser (supports Turtle, N-Triples, N-Quads, TriG)
-            const parser = new N3.Parser({ baseIRI: url });
-            const quads = parser.parse(contentStr);
-            quads.forEach(quad => {
-              let datatype = '';
-              if (quad.object.termType === 'Literal') {
-                datatype = quad.object.datatype.value;
-              }
-              triples.push({
-                subject: quad.subject.value,
-                predicate: quad.predicate.value,
-                object: quad.object.value,
-                objectType: quad.object.termType,
-                datatype: datatype
-              });
-            });
-            parsed = true;
+      if (hasRdf && overview && overview.found) {
+        for (const item of overview.found) {
+          const contentStr = typeof item.content === 'string' 
+            ? item.content 
+            : JSON.stringify(item.content);
+          
+          if (!primaryRawContent) {
+            primaryRawContent = contentStr;
+            primarySource = item.source || 'Content Negotiation';
+            primaryFormat = item.format || item.mime || '';
+            primaryUrl = item.url || uriToFetch;
           }
-        } catch (e: any) {
-          console.error(`Parsing failed for format ${format}:`, e);
+
+          const parsedTriples = await parseRdfToTriples(contentStr, item.format || item.mime || '', item.url || uriToFetch);
+          
+          // Store under this strategy
+          const srcKey = item.source || 'content-negotiation';
+          if (!triplesMap[srcKey]) triplesMap[srcKey] = [];
+          triplesMap[srcKey] = [...triplesMap[srcKey], ...parsedTriples];
+
+          // Merge to the global pool (avoiding exact duplicates)
+          parsedTriples.forEach((pt: any) => {
+            if (!allMergedTriples.some(t => t.subject === pt.subject && t.predicate === pt.predicate && t.object === pt.object)) {
+              allMergedTriples.push(pt);
+            }
+          });
         }
-      } else {
-        source = "Extended Web-Link Relations";
-        format = "linkset-relations";
       }
 
       // Convert Link Relations to Triples and merge
@@ -963,18 +989,32 @@ const TryOutSection = () => {
       if (hasLinks && linkRelations) {
         const relationTriples = convertRelationsToTriples(linkRelations, uriToFetch);
         extendedLinksCount = relationTriples.length;
-        triples = [...triples, ...relationTriples];
+        triplesMap['extended-links'] = relationTriples;
+        
+        relationTriples.forEach((rt: any) => {
+          if (!allMergedTriples.some(t => t.subject === rt.subject && t.predicate === rt.predicate && t.object === rt.object)) {
+            allMergedTriples.push(rt);
+          }
+        });
+      }
+
+      setStrategyTriples(triplesMap);
+
+      if (overview && overview.trace) {
+        setTraceSteps(overview.trace);
+      } else {
+        setTraceSteps([]);
       }
 
       const newData = {
         metadata: {
-          source,
-          format,
-          url,
+          source: primarySource || 'Extended Web-Link Relations',
+          format: primaryFormat || 'linkset-relations',
+          url: primaryUrl,
           extendedLinksCount
         },
-        triples,
-        rawContent: parsed ? null : contentStr
+        triples: allMergedTriples,
+        rawContent: primaryRawContent || null
       };
 
       // Tag triples with their source URI for grouping in the graph
@@ -1244,6 +1284,12 @@ const TryOutSection = () => {
                   >
                     <TerminalSquare size={16} /> Extracted Triples
                   </button>
+                  <button
+                    onClick={() => setActiveTab('report')}
+                    className={`px-8 py-5 text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 border-r border-accent/10 ${activeTab === 'report' ? 'bg-white text-accent' : 'text-[#666] hover:bg-white/50'}`}
+                  >
+                    <Activity size={16} /> Cascade Report
+                  </button>
                 </div>
                 <div className="px-6 hidden sm:block">
                   <span className="text-[10px] text-[#666] font-mono uppercase tracking-tighter">Exploration Workspace</span>
@@ -1350,6 +1396,140 @@ const TryOutSection = () => {
                   </div>
                 )}
 
+                {activeTab === 'report' && (
+                  <div className="flex-1 flex flex-col bg-[#f8fafc] p-6 md:p-8 overflow-y-auto max-h-[650px]">
+                    {/* Report Overview Dashboard */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                      <div className="bg-white border border-accent/15 rounded-xl p-5 shadow-sm flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+                          <Activity size={20} />
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-poster-dark/50 font-bold mb-0.5">Cascade Flow</div>
+                          <div className="font-sans font-black text-lg text-poster-dark">
+                            {traceSteps.length > 0 ? traceSteps.length : 29} checked
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-accent/15 rounded-xl p-5 shadow-sm flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-600">
+                          <CheckCircle2 size={20} />
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-poster-dark/50 font-bold mb-0.5">Successful Hits</div>
+                          <div className="font-sans font-black text-lg text-poster-dark">
+                            {traceSteps.filter(t => t.found).length} strategies
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-accent/15 rounded-xl p-5 shadow-sm flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-teal-500/10 flex items-center justify-center text-teal-600">
+                          <Layers size={20} />
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-poster-dark/50 font-bold mb-0.5">Extracted Graph</div>
+                          <div className="font-sans font-black text-lg text-poster-dark">
+                            {result?.triples?.length || 0} triples
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Trace Steps Table */}
+                    <div className="bg-white border border-accent/15 rounded-2xl overflow-hidden shadow-sm">
+                      <div className="p-5 border-b border-accent/10 bg-white flex items-center justify-between">
+                        <h4 className="font-sans font-black text-poster-dark tracking-tight text-sm">
+                          Cascade Strategy Trace Steps
+                        </h4>
+                        <span className="px-2 py-0.5 bg-accent/5 rounded text-[10px] font-mono font-bold text-accent uppercase tracking-wider">
+                          --all active
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs font-sans border-collapse">
+                          <thead className="bg-[#f8fafc] text-poster-dark/50 border-b border-accent/10 font-bold font-mono">
+                            <tr>
+                              <th className="p-4 uppercase tracking-wider text-[10px]">Step</th>
+                              <th className="p-4 uppercase tracking-wider text-[10px]">Strategy</th>
+                              <th className="p-4 uppercase tracking-wider text-[10px]">Quadrant</th>
+                              <th className="p-4 uppercase tracking-wider text-[10px]">Status</th>
+                              <th className="p-4 uppercase tracking-wider text-[10px]">Payload</th>
+                              <th className="p-4 uppercase tracking-wider text-[10px]">Triples</th>
+                              <th className="p-4 uppercase tracking-wider text-[10px] text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-accent/5">
+                            {traceSteps.map((step) => {
+                              const strategyTriplesCount = (strategyTriples[step.source] || []).length;
+                              return (
+                                <tr key={step.source} className="hover:bg-accent/5 transition-colors">
+                                  <td className="p-4 font-mono font-black text-poster-dark/50 text-[11px]">
+                                    Step 0{step.strategy || step.strategy === 0 ? step.strategy : step.index + 1}
+                                  </td>
+                                  <td className="p-4 font-sans font-bold text-poster-dark text-xs">
+                                    {step.label}
+                                  </td>
+                                  <td className="p-4 font-sans font-semibold text-poster-dark/70 text-xs">
+                                    Q{step.quadrant}: {
+                                      step.quadrant === 1 ? "Resource-Direct" :
+                                      step.quadrant === 2 ? "Resource-Inferenced" :
+                                      step.quadrant === 3 ? "Domain-Direct" :
+                                      "Domain-Inferenced"
+                                    }
+                                  </td>
+                                  <td className="p-4">
+                                    {step.found ? (
+                                      <span className="px-2 py-0.5 bg-green-500/10 text-green-600 rounded-full text-[9px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                                        <span className="w-1 h-1 rounded-full bg-green-500" /> RDF Found
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 bg-red-500/10 text-red-600 rounded-full text-[9px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                                        <span className="w-1 h-1 rounded-full bg-red-500" /> No RDF
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="p-4 font-mono font-bold text-poster-dark/70 text-[11px]">
+                                    {step.found && step.hits?.[0]?.chars
+                                      ? `${(step.hits[0].chars / 1024).toFixed(2)} KB`
+                                      : "-"}
+                                  </td>
+                                  <td className="p-4 font-mono font-bold text-[11px]">
+                                    {step.found ? (
+                                      <span className="text-accent">{strategyTriplesCount} triples</span>
+                                    ) : (
+                                      <span className="text-poster-dark/40">-</span>
+                                    )}
+                                  </td>
+                                  <td className="p-4 text-right">
+                                    {step.found && strategyTriplesCount > 0 ? (
+                                      <button
+                                        onClick={() => setSelectedReportStrategy(step)}
+                                        className="px-3 py-1.5 bg-accent hover:opacity-90 transition-opacity text-white text-[10px] font-bold uppercase tracking-widest rounded-md inline-flex items-center gap-1 shadow-sm font-sans"
+                                      >
+                                        View Triples
+                                      </button>
+                                    ) : (
+                                      <button
+                                        disabled
+                                        className="px-3 py-1.5 border border-slate-200 text-slate-400 text-[10px] font-bold uppercase tracking-widest rounded-md inline-flex items-center gap-1 cursor-not-allowed font-sans"
+                                      >
+                                        No Triples
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* URI Action Modal/Overlay */}
                 <AnimatePresence>
                   {showUriActions && selectedUri && (
@@ -1414,23 +1594,102 @@ const TryOutSection = () => {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Strategy Triples Detail Modal */}
+                <AnimatePresence>
+                  {selectedReportStrategy && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-6"
+                      onClick={() => setSelectedReportStrategy(null)}
+                    >
+                      <motion.div
+                        initial={{ scale: 0.9, y: 20 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.9, y: 20 }}
+                        className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full border border-accent/20 flex flex-col max-h-[90%]"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between mb-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+                              {(() => {
+                                const Icon = STRATEGY_ICONS[selectedReportStrategy.source] || Search;
+                                return <Icon size={24} />;
+                              })()}
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-poster-dark font-sans">{selectedReportStrategy.label} Triples</h4>
+                              <p className="text-[10px] text-[#666] font-sans">
+                                Extracted {(strategyTriples[selectedReportStrategy.source] || []).length} triples
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const triples = strategyTriples[selectedReportStrategy.source] || [];
+                              const ntriplesContent = triples.map(t => {
+                                const objStr = t.objectType === 'Literal' ? `"${t.object}"` : `<${t.object}>`;
+                                return `<${t.subject}> <${t.predicate}> ${objStr} .`;
+                              }).join('\n');
+                              const blob = new Blob([ntriplesContent], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `${selectedReportStrategy.label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_triples.nt`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white font-mono text-[10px] font-bold uppercase tracking-widest rounded-lg flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                          >
+                            Download .nt
+                          </button>
+                        </div>
+
+                        <div className="flex-1 overflow-auto bg-slate-900 border border-slate-800 rounded-xl mb-6">
+                          <table className="w-full text-left text-xs font-mono border-collapse">
+                            <thead className="text-white/40 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+                              <tr>
+                                <th className="p-3 font-normal uppercase tracking-widest text-[9px]">Subject</th>
+                                <th className="p-3 font-normal uppercase tracking-widest text-[9px]">Predicate</th>
+                                <th className="p-3 font-normal uppercase tracking-widest text-[9px]">Object</th>
+                              </tr>
+                            </thead>
+                            <tbody className="text-white/80">
+                              {(strategyTriples[selectedReportStrategy.source] || []).map((t: any, i: number) => (
+                                <tr key={i} className="border-b border-slate-800 hover:bg-white/5 transition-colors">
+                                  <td className="p-3 text-accent break-all max-w-[180px] font-medium">{t.subject}</td>
+                                  <td className="p-3 text-[#64b5f6] break-all max-w-[180px]">{t.predicate}</td>
+                                  <td className="p-3 break-all text-[#e2e8f0] max-w-[200px]">
+                                    {t.objectType === 'Literal' ? (
+                                      <span className="text-green-400">"{t.object}"</span>
+                                    ) : (
+                                      <span className="text-yellow-500">{"<"}{t.object}{">"}</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <button
+                          onClick={() => setSelectedReportStrategy(null)}
+                          className="w-full py-3 text-center border border-slate-200 hover:bg-slate-50 text-poster-dark text-xs font-bold uppercase tracking-widest rounded-lg transition-colors cursor-pointer font-sans"
+                        >
+                          Close
+                        </button>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
-            {result.rawContent && (
-              <div className="strategy-card-blueprint rounded-2xl overflow-hidden border border-accent/20">
-                <div className="border-b border-accent/10 p-6 bg-white/50">
-                  <h3 className="font-bold flex items-center gap-2 text-poster-dark">
-                    <FileCode size={18} className="text-accent" /> Raw Source Content
-                  </h3>
-                </div>
-                <div className="p-8 bg-[#0a0a0a] overflow-x-auto max-h-[300px] overflow-y-auto">
-                  <pre className="text-xs font-mono text-white/70 whitespace-pre-wrap break-words leading-relaxed">
-                    {result.rawContent}
-                  </pre>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1457,35 +1716,60 @@ export default function App() {
         ))}
       </div>
 
-      {/* Hero & Machine Section */}
-      <section className="relative min-h-screen z-20 flex flex-col items-center justify-center pt-32 pb-16 px-8 max-w-5xl mx-auto text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="max-w-4xl px-8 mb-16"
-        >
-          <div className="mb-6 flex justify-center">
-            <span className="text-accent font-black tracking-widest uppercase text-xs border border-accent/20 px-4 py-1.5 rounded-full bg-accent/5">
-              THE SOLUTION: RADICAL TRANSPARENCY
-            </span>
-          </div>
-          <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-none mb-6 title-glow">
-            WRX MODULE
-          </h1>
-          <p className="text-poster-dark/60 text-lg md:text-xl max-w-2xl mx-auto mb-10 font-medium">
-            Web Resource Extraction Framework for automated RDF discovery through
-            the cascading path approach.
-          </p>
-        </motion.div>
+      {/* Hero Section */}
+      <section className="relative min-h-screen z-20 flex items-center justify-center pt-28 pb-16 px-8 max-w-7xl mx-auto">
+        <div className="grid lg:grid-cols-12 gap-12 items-center w-full">
+          {/* Left Column: Copy & Actions */}
+          <motion.div
+            initial={{ opacity: 0, x: -35 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="lg:col-span-4 flex flex-col items-start text-left space-y-6"
+          >
+            <div className="flex justify-center">
+              <span className="text-accent font-black tracking-widest uppercase text-[10px] border border-accent/20 px-3.5 py-1.5 rounded-full bg-accent/5 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                WRX Discovery Framework
+              </span>
+            </div>
+            <h1 className="text-5xl md:text-7xl font-black tracking-tighter leading-[0.95] text-poster-dark">
+              Findable is <br />
+              <span className="text-accent">not Explorable.</span>
+            </h1>
+            <p className="text-poster-dark/75 text-base md:text-lg max-w-xl font-medium leading-relaxed">
+              Standard web clients stall because URLs rarely reveal where RDF metadata lives.
+            </p>
+            <p className="text-poster-dark/60 text-sm md:text-base max-w-xl leading-relaxed">
+              <strong>WRX</strong> traverses standard web protocols automatically—from content negotiation to external linksets and sitemaps—turning any raw URL into a traversable knowledge graph.
+            </p>
+            <div className="flex flex-wrap gap-4 pt-4 w-full">
+              <a
+                href="#sandbox"
+                className="px-6 py-3.5 bg-accent text-white font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-accent/20 cursor-pointer"
+              >
+                <Play size={12} fill="white" /> Launch Sandbox
+              </a>
+              <a
+                href="https://cedricdcc.github.io/papers/wrx/wrx.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-3.5 border border-poster-dark/20 hover:bg-poster-dark/5 text-poster-dark font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <BookOpen size={12} /> Read Paper
+              </a>
+            </div>
+          </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-        >
-          <BlueBox scrollOpacity={1} />
-        </motion.div>
+          {/* Right Column: Visualizer HUD */}
+          <motion.div
+            initial={{ opacity: 0, x: 35 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+            className="lg:col-span-8 w-full flex justify-center"
+          >
+            <CascadeVisualizerHUD />
+          </motion.div>
+        </div>
       </section>
 
       {/* Problem Section */}
