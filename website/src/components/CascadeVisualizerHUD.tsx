@@ -284,13 +284,13 @@ export default function CascadeVisualizerHUD() {
   }, [presetIndex]);
 
   return (
-    <div className="w-full max-w-2xl bg-slate-950/90 border border-accent/25 rounded-3xl p-6 shadow-2xl flex flex-col gap-6 backdrop-blur-md select-none">
+    <div className="w-full max-w-2xl flex flex-col gap-6 select-none">
       
       {/* 1. TOP: Clean glowing URI Address Field */}
-      <div className="w-full max-w-xl mx-auto p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center font-mono text-[11px] md:text-xs text-accent-light tracking-wide shadow-inner relative overflow-hidden">
-        <div className="flex items-center gap-1.5 shrink-0 select-none mr-3 text-slate-500">
-          <Globe size={13} />
-          <span className="text-[9px] font-bold uppercase tracking-widest bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800/80">URI</span>
+      <div className="w-full max-w-xl mx-auto p-4 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center font-mono text-xs md:text-sm text-accent-light tracking-wide shadow-inner relative overflow-hidden">
+        <div className="flex items-center gap-2 shrink-0 select-none mr-3 text-slate-500">
+          <Globe size={15} />
+          <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest bg-slate-950 px-2 py-0.5 rounded border border-slate-800/80">URI</span>
         </div>
         <div className="flex-1 truncate relative flex items-center">
           <span>{displayedUri || "Waiting for address..."}</span>
@@ -319,7 +319,7 @@ export default function CascadeVisualizerHUD() {
       </div>
 
       {/* 2. CENTER: The Morphing Black Box -> 2x2 Matrix Container */}
-      <div className="w-full max-w-md h-48 mx-auto relative flex items-center justify-center">
+      <div className="w-full max-w-xl h-64 mx-auto relative flex items-center justify-center">
         <AnimatePresence mode="wait">
           {currentStage !== "matrix" ? (
             // Stage 2: The URI Black Box View
@@ -331,10 +331,10 @@ export default function CascadeVisualizerHUD() {
               transition={{ duration: 0.4 }}
               className={`absolute inset-0 p-5 rounded-2xl border transition-all duration-300 flex flex-col items-center justify-center text-center gap-3 overflow-hidden ${
                 currentStage === "blackbox"
-                  ? "bg-slate-900 border-accent shadow-[0_0_25px_rgba(61,122,141,0.25)]"
+                  ? "bg-slate-950 border-accent shadow-[0_0_25px_rgba(61,122,141,0.25)]"
                   : currentStage === "output"
-                  ? "bg-slate-900/50 border-slate-850"
-                  : "bg-slate-900/20 border-slate-900/40"
+                  ? "bg-slate-950/80 border-slate-800"
+                  : "bg-slate-950 border-slate-900"
               }`}
             >
               {/* Binary stream backdrop */}
@@ -356,16 +356,16 @@ export default function CascadeVisualizerHUD() {
                 ))}
               </div>
 
-              <div className="relative z-10 flex flex-col items-center gap-2">
+              <div className="relative z-10 flex flex-col items-center gap-3">
                 <div className="relative">
-                  <Cpu size={32} className={currentStage === "blackbox" ? "text-accent-light animate-spin-slow" : "text-slate-650"} />
+                  <Cpu size={44} className={currentStage === "blackbox" ? "text-accent-light animate-spin-slow" : "text-slate-650"} />
                   {currentStage === "blackbox" && (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-accent animate-ping" />
+                    <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-accent animate-ping" />
                   )}
                 </div>
                 <div>
-                  <h5 className="text-xs font-sans font-black uppercase tracking-wider text-slate-200">URI Black Box</h5>
-                  <p className="text-[9px] font-mono text-slate-400 mt-1 max-w-[240px]">
+                  <h5 className="text-sm md:text-base font-sans font-black uppercase tracking-wider text-slate-200">URI Black Box</h5>
+                  <p className="text-[11px] md:text-xs font-mono text-slate-400 mt-1.5 max-w-[340px]">
                     {statusText || "Diagnostics Inactive"}
                   </p>
                 </div>
@@ -379,7 +379,7 @@ export default function CascadeVisualizerHUD() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.4 }}
-              className="absolute inset-0 p-5 bg-slate-900 border border-accent rounded-2xl flex flex-col gap-2.5 shadow-[0_0_25px_rgba(61,122,141,0.2)]"
+              className="absolute inset-0 p-5 bg-slate-950 border border-accent rounded-2xl flex flex-col gap-2.5 shadow-[0_0_25px_rgba(61,122,141,0.2)]"
             >
               {/* Binary backdrop inside Matrix */}
               <div className="absolute inset-0 select-none pointer-events-none opacity-20">
@@ -400,70 +400,70 @@ export default function CascadeVisualizerHUD() {
                 ))}
               </div>
 
-              <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-1 relative z-10">
-                <span className="text-[9px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 text-slate-350">
-                  <Layers size={11} className="text-accent-light" /> 2x2 Discovery Matrix
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 relative z-10">
+                <span className="text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 text-slate-350">
+                  <Layers size={14} className="text-accent-light" /> 2x2 Discovery Matrix
                 </span>
-                <span className="text-[8px] font-mono text-slate-500">Taxonomy Evaluation</span>
+                <span className="text-[10px] font-mono text-slate-500">Taxonomy Evaluation</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 relative z-10 flex-1">
+              <div className="grid grid-cols-2 gap-3 relative z-10 flex-1">
                 {/* Q1 */}
-                <div className={`rounded-xl border p-2.5 flex flex-col justify-center transition-all duration-300 ${
+                <div className={`rounded-xl border p-3.5 flex flex-col justify-center transition-all duration-300 ${
                   activeQuadrant === 1
                     ? "bg-accent/20 border-accent text-accent-light shadow-[0_0_10px_rgba(96,165,250,0.1)] scale-[1.02]"
                     : quadrantStates[1] === "success"
                     ? "bg-green-950/20 border-green-500/40 text-green-400"
                     : quadrantStates[1] === "failed"
-                    ? "bg-red-950/10 border-red-950/25 text-red-500/50"
-                    : "bg-slate-950/40 border-slate-850/40 text-slate-650"
+                    ? "bg-red-950/35 border-red-500/30 text-red-400"
+                    : "bg-slate-900 border-slate-800/80 text-slate-400"
                 }`}>
-                  <div className="text-[9px] font-sans font-bold uppercase leading-tight truncate">Q1: Resource-Direct</div>
-                  <div className="text-[7px] font-mono text-slate-500 mt-0.5 truncate">Conneg, HTTP Links</div>
+                  <div className="text-[11px] md:text-xs font-sans font-bold uppercase leading-tight truncate">Q1: Resource-Direct</div>
+                  <div className="text-[9px] md:text-xs font-mono opacity-60 mt-1 truncate">Conneg, HTTP Links</div>
                 </div>
                 {/* Q2 */}
-                <div className={`rounded-xl border p-2.5 flex flex-col justify-center transition-all duration-300 ${
+                <div className={`rounded-xl border p-3.5 flex flex-col justify-center transition-all duration-300 ${
                   activeQuadrant === 2
                     ? "bg-accent/20 border-accent text-accent-light shadow-[0_0_10px_rgba(96,165,250,0.1)] scale-[1.02]"
                     : quadrantStates[2] === "success"
                     ? "bg-green-950/20 border-green-500/40 text-green-400"
                     : quadrantStates[2] === "failed"
-                    ? "bg-red-950/10 border-red-950/25 text-red-500/50"
-                    : "bg-slate-950/40 border-slate-850/40 text-slate-650"
+                    ? "bg-red-950/35 border-red-500/30 text-red-400"
+                    : "bg-slate-900 border-slate-800/80 text-slate-400"
                 }`}>
-                  <div className="text-[9px] font-sans font-bold uppercase leading-tight truncate">Q2: Resource-Inferred</div>
-                  <div className="text-[7px] font-mono text-slate-500 mt-0.5 truncate">HTML signposts, scripts</div>
+                  <div className="text-[11px] md:text-xs font-sans font-bold uppercase leading-tight truncate">Q2: Resource-Inferred</div>
+                  <div className="text-[9px] md:text-xs font-mono opacity-60 mt-1 truncate">HTML signposts, scripts</div>
                 </div>
                 {/* Q3 */}
-                <div className={`rounded-xl border p-2.5 flex flex-col justify-center transition-all duration-300 ${
+                <div className={`rounded-xl border p-3.5 flex flex-col justify-center transition-all duration-300 ${
                   activeQuadrant === 3
                     ? "bg-accent/20 border-accent text-accent-light shadow-[0_0_10px_rgba(96,165,250,0.1)] scale-[1.02]"
                     : quadrantStates[3] === "success"
                     ? "bg-green-950/20 border-green-500/40 text-green-400"
                     : quadrantStates[3] === "failed"
-                    ? "bg-red-950/10 border-red-950/25 text-red-500/50"
-                    : "bg-slate-950/40 border-slate-850/40 text-slate-650"
+                    ? "bg-red-950/35 border-red-500/30 text-red-400"
+                    : "bg-slate-900 border-slate-800/80 text-slate-400"
                 }`}>
-                  <div className="text-[9px] font-sans font-bold uppercase leading-tight truncate">Q3: Domain-Direct</div>
-                  <div className="text-[7px] font-mono text-slate-500 mt-0.5 truncate">Linksets, Catalogs</div>
+                  <div className="text-[11px] md:text-xs font-sans font-bold uppercase leading-tight truncate">Q3: Domain-Direct</div>
+                  <div className="text-[9px] md:text-xs font-mono opacity-60 mt-1 truncate">Linksets, Catalogs</div>
                 </div>
                 {/* Q4 */}
-                <div className={`rounded-xl border p-2.5 flex flex-col justify-center transition-all duration-300 ${
+                <div className={`rounded-xl border p-3.5 flex flex-col justify-center transition-all duration-300 ${
                   activeQuadrant === 4
                     ? "bg-accent/20 border-accent text-accent-light shadow-[0_0_10px_rgba(96,165,250,0.1)] scale-[1.02]"
                     : quadrantStates[4] === "success"
                     ? "bg-green-950/20 border-green-500/40 text-green-400"
                     : quadrantStates[4] === "failed"
-                    ? "bg-red-950/10 border-red-950/25 text-red-500/50"
-                    : "bg-slate-950/40 border-slate-850/40 text-slate-650"
+                    ? "bg-red-950/35 border-red-500/30 text-red-400"
+                    : "bg-slate-900 border-slate-800/80 text-slate-400"
                 }`}>
-                  <div className="text-[9px] font-sans font-bold uppercase leading-tight truncate">Q4: Domain-Inferred</div>
-                  <div className="text-[7px] font-mono text-slate-500 mt-0.5 truncate">robots.txt, Sitemap XML</div>
+                  <div className="text-[11px] md:text-xs font-sans font-bold uppercase leading-tight truncate">Q4: Domain-Inferred</div>
+                  <div className="text-[9px] md:text-xs font-mono opacity-60 mt-1 truncate">robots.txt, Sitemap XML</div>
                 </div>
               </div>
 
               {/* Localized Strategy Sub-label */}
-              <div className="text-[9px] font-mono text-slate-400 text-center animate-pulse py-1 mt-1 bg-slate-950/40 border border-slate-850 rounded-lg max-w-sm mx-auto w-full truncate relative z-10">
+              <div className="text-[11px] md:text-xs font-mono text-slate-400 text-center animate-pulse py-2 mt-1.5 bg-slate-950/40 border border-slate-850 rounded-lg max-w-md mx-auto w-full truncate relative z-10">
                 {statusText}
               </div>
             </motion.div>
@@ -480,7 +480,7 @@ export default function CascadeVisualizerHUD() {
             transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
             cx="8"
             cy="0"
-            r="2.5"
+            r="3.5"
             fill={currentStage === "output" ? "#22c55e" : "#4b5563"}
             className="glow-line"
           />
@@ -488,13 +488,13 @@ export default function CascadeVisualizerHUD() {
       </div>
 
       {/* 3. BOTTOM: The Animated SVG Knowledge Graph Panel (Site Palette) */}
-      <div className="w-full max-w-xl mx-auto bg-slate-900/50 border border-slate-850/80 rounded-2xl p-4 flex flex-col relative overflow-hidden select-none h-64">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 relative z-10">
-          <div className="flex items-center gap-1.5 text-[9px] font-mono font-bold tracking-widest text-slate-500 uppercase">
-            <Network size={12} className="text-accent animate-pulse" /> Resolved RDF Graph Output
+      <div className="w-full max-w-xl mx-auto bg-slate-950 border border-slate-800 rounded-2xl p-6 flex flex-col relative overflow-hidden select-none h-64">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-2.5 relative z-10">
+          <div className="flex items-center gap-2 text-xs font-mono font-bold tracking-widest text-slate-400 uppercase">
+            <Network size={14} className="text-accent animate-pulse" /> Resolved RDF Graph Output
           </div>
           {showGraph && (
-            <span className="px-2 py-0.5 bg-accent/10 text-accent-light rounded-full text-[8px] font-bold border border-accent/20">
+            <span className="px-3 py-1 bg-accent/10 text-accent-light rounded-full text-xs font-bold border border-accent/20">
               ACTIVE
             </span>
           )}
@@ -553,7 +553,7 @@ export default function CascadeVisualizerHUD() {
                           x={(fromNode.x + toNode.x) / 2}
                           y={(fromNode.y + toNode.y) / 2 - 5}
                           fill="#64b5f6"
-                          fontSize="8"
+                          fontSize="10"
                           textAnchor="middle"
                           fontFamily="monospace"
                           fontWeight="bold"
@@ -575,12 +575,12 @@ export default function CascadeVisualizerHUD() {
                     // Styles mapping directly to the site palette
                     const fill =
                       node.type === "subject"
-                        ? "rgba(61, 122, 141, 0.25)"  // Teal fill
+                        ? "rgba(61, 122, 141, 0.3)"   // Teal fill
                         : node.type === "uri"
-                        ? "rgba(100, 181, 246, 0.15)" // Soft blue fill
+                        ? "rgba(100, 181, 246, 0.2)"  // Soft blue fill
                         : node.type === "class"
-                        ? "rgba(26, 59, 76, 0.5)"     // Navy fill
-                        : "rgba(61, 122, 141, 0.1)";  // Literal fill
+                        ? "rgba(129, 140, 248, 0.2)"  // Indigo fill
+                        : "rgba(203, 213, 225, 0.15)"; // Literal fill
 
                     const stroke =
                       node.type === "subject"
@@ -588,8 +588,8 @@ export default function CascadeVisualizerHUD() {
                         : node.type === "uri"
                         ? "#64b5f6" // Soft blue border
                         : node.type === "class"
-                        ? "#1a3b4c" // Navy border
-                        : "#475569"; // Muted border
+                        ? "#818cf8" // Indigo border
+                        : "#cbd5e1"; // Bright grey border
 
                     const textFill =
                       node.type === "subject"
@@ -597,8 +597,8 @@ export default function CascadeVisualizerHUD() {
                         : node.type === "uri"
                         ? "#bfdbfe"
                         : node.type === "class"
-                        ? "#94a3b8"
-                        : "#cbd5e1";
+                        ? "#c7d2fe"
+                        : "#f1f5f9";
 
                     return (
                       <motion.g
@@ -628,9 +628,9 @@ export default function CascadeVisualizerHUD() {
                         />
                         <text
                           x={node.x}
-                          y={node.y + (node.type === "subject" ? 28 : 24)}
+                          y={node.y + (node.type === "subject" ? 30 : 26)}
                           fill={textFill}
-                          fontSize="8"
+                          fontSize="10"
                           textAnchor="middle"
                           fontFamily="monospace"
                           fontWeight={node.type === "subject" ? "bold" : "normal"}
@@ -647,9 +647,9 @@ export default function CascadeVisualizerHUD() {
                   <motion.div
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="absolute top-2 right-2 p-1 bg-accent/15 border border-accent/25 rounded-md flex items-center gap-1 text-[8px] font-mono text-accent-light"
+                    className="absolute top-2.5 right-2.5 px-2 py-1 bg-accent/15 border border-accent/25 rounded-md flex items-center gap-1.5 text-[10px] font-mono text-accent-light"
                   >
-                    <Sparkles size={10} className="fill-accent-light/10 text-accent-light" /> Graph Resolved
+                    <Sparkles size={12} className="fill-accent-light/10 text-accent-light" /> Graph Resolved
                   </motion.div>
                 )}
               </motion.div>
@@ -659,10 +659,10 @@ export default function CascadeVisualizerHUD() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center text-center text-slate-700 gap-2"
+                className="flex flex-col items-center justify-center text-center text-slate-400 gap-2.5"
               >
-                <HelpCircle size={28} className="stroke-[1.5] animate-pulse" />
-                <span className="text-[11px] font-medium font-sans max-w-[180px] leading-normal text-slate-500">
+                <HelpCircle size={36} className="stroke-[1.5] animate-pulse text-slate-500" />
+                <span className="text-xs md:text-sm font-medium font-sans max-w-[240px] leading-normal text-slate-400">
                   {isPlaying
                     ? "Resolving signposting & building RDF..."
                     : "Awaiting automated data stream ingestion..."}
