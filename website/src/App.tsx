@@ -30,7 +30,7 @@ import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import KnowledgeGraph from "./components/KnowledgeGraph";
 import CascadeVisualizerHUD from "./components/CascadeVisualizerHUD";
-import { extractRDF, extractLinkRelations, extractAllRDF } from "wrx";
+import { extractRDF, extractLinkRelations, extractAllRDF, collectProfileValues } from "wrx";
 import * as N3 from "n3";
 import { QueryEngine } from "@comunica/query-sparql-rdfjs";
 import jsonld from "jsonld";
@@ -986,6 +986,10 @@ const TryOutSection = () => {
 
       // Convert Link Relations to Triples and merge
       let extendedLinksCount = 0;
+      let profiles: string[] = [];
+      if (linkRelations) {
+        profiles = collectProfileValues(linkRelations);
+      }
       if (hasLinks && linkRelations) {
         const relationTriples = convertRelationsToTriples(linkRelations, uriToFetch);
         extendedLinksCount = relationTriples.length;
@@ -1011,7 +1015,8 @@ const TryOutSection = () => {
           source: primarySource || 'Extended Web-Link Relations',
           format: primaryFormat || 'linkset-relations',
           url: primaryUrl,
-          extendedLinksCount
+          extendedLinksCount,
+          profiles
         },
         triples: allMergedTriples,
         rawContent: primaryRawContent || null
@@ -1217,14 +1222,49 @@ const TryOutSection = () => {
       {result && (
         <div className="space-y-12 relative">
           <div className="grid md:grid-cols-4 gap-6">
+            {/* Box 1: Actual URL */}
             <div className="p-6 bg-white border border-accent/10 rounded-xl shadow-sm">
-              <div className="text-[10px] uppercase tracking-widest text-[#666] mb-2">Source Strategy</div>
+              <div className="text-[10px] uppercase tracking-widest text-[#666] mb-2">Actual URL</div>
+              <div className="font-bold text-poster-dark truncate text-xs" title={result.metadata.url}>{result.metadata.url}</div>
+            </div>
+
+            {/* Box 2: Discovery Strategy */}
+            <div className="p-6 bg-white border border-accent/10 rounded-xl shadow-sm">
+              <div className="text-[10px] uppercase tracking-widest text-[#666] mb-2">Discovery Strategy</div>
               <div className="font-bold text-accent">{result.metadata.source}</div>
             </div>
+
+            {/* Box 3: Profiles */}
             <div className="p-6 bg-white border border-accent/10 rounded-xl shadow-sm">
-              <div className="text-[10px] uppercase tracking-widest text-[#666] mb-2">Format</div>
-              <div className="font-bold text-poster-dark">{result.metadata.format || 'Unknown'}</div>
+              <div className="text-[10px] uppercase tracking-widest text-[#666] mb-2">Profiles</div>
+              <div className="font-bold text-poster-dark flex flex-wrap gap-1.5 mt-1">
+                {result.metadata.profiles && result.metadata.profiles.length > 0 ? (
+                  result.metadata.profiles.map((prof: string, idx: number) => {
+                    let label = prof;
+                    try {
+                      const urlObj = new URL(prof);
+                      label = urlObj.hash ? urlObj.hash.substring(1) : urlObj.pathname.split('/').filter(Boolean).pop() || prof;
+                    } catch (e) {}
+                    return (
+                      <a
+                        key={idx}
+                        href={prof}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2 py-0.5 bg-accent/10 hover:bg-accent/20 border border-accent/20 text-accent rounded text-[10px] font-mono font-bold tracking-tight transition-colors truncate max-w-[150px]"
+                        title={prof}
+                      >
+                        {label}
+                      </a>
+                    );
+                  })
+                ) : (
+                  <span className="text-poster-dark/40 font-normal text-xs italic">No profile declared</span>
+                )}
+              </div>
             </div>
+
+            {/* Box 4: Total Triples */}
             <div className="p-6 bg-white border border-accent/10 rounded-xl shadow-sm">
               <div className="text-[10px] uppercase tracking-widest text-[#666] mb-2">Total Triples</div>
               <div className="font-bold text-poster-dark flex items-center gap-2">
@@ -1235,10 +1275,6 @@ const TryOutSection = () => {
                   </span>
                 )}
               </div>
-            </div>
-            <div className="p-6 bg-white border border-accent/10 rounded-xl shadow-sm">
-              <div className="text-[10px] uppercase tracking-widest text-[#666] mb-2">Active URI</div>
-              <div className="font-bold text-poster-dark truncate text-xs">{result.metadata.url}</div>
             </div>
           </div>
 
@@ -1699,6 +1735,106 @@ const TryOutSection = () => {
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isReturningVisitor, setIsReturningVisitor] = useState(false);
+
+  useEffect(() => {
+    const hasVisited = localStorage.getItem("visited_wrx");
+    if (hasVisited) {
+      setIsReturningVisitor(true);
+    } else {
+      localStorage.setItem("visited_wrx", "true");
+    }
+  }, []);
+
+  const problemSection = <ProblemSection key="problem" />;
+  const strategiesSection = <StrategiesSection key="strategies" />;
+  const roadmapSection = <RoadmapSection key="roadmap" />;
+  
+  const resultSection = (
+    <section key="result" className="relative py-24 md:py-32 w-full flex items-center justify-center z-40 bg-poster-bg border-t border-accent/10">
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="w-full max-w-5xl px-8"
+      >
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div className="space-y-8">
+            <div>
+              <span className="text-accent font-black uppercase text-xs tracking-widest block mb-4">THE RESULT</span>
+              <h2 className="text-4xl md:text-6xl font-black text-poster-dark tracking-tighter">
+                True<br />Interoperability
+              </h2>
+            </div>
+            <p className="text-[#666] leading-relaxed">
+              A foundation for evolving, scalable data ecosystems across heterogeneous sources.
+              Each step scored on reliability, provenance, and conversion metadata.
+            </p>
+            <div className="flex gap-4">
+              <div className="p-4 bg-accent/5 border border-accent/10 rounded-lg flex-1">
+                <div className="flex items-center gap-2 text-accent mb-2 font-bold text-sm tracking-tight">
+                  <Zap size={16} /> Measurable
+                </div>
+                <div className="text-[10px] text-poster-dark/50 uppercase font-mono">Real-time scoring</div>
+              </div>
+              <div className="p-4 bg-accent/5 border border-accent/10 rounded-lg flex-1">
+                <div className="flex items-center gap-2 text-accent mb-2 font-bold text-sm tracking-tight">
+                  <Layers size={16} /> Standardized
+                </div>
+                <div className="text-[10px] text-poster-dark/50 uppercase font-mono">Open protocols</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="strategy-card-blueprint p-8 md:p-12 rounded-2xl">
+            <h3 className="font-bold mb-6 flex items-center gap-2 text-poster-dark">
+              <Code2 className="text-accent" /> Start Discovery
+            </h3>
+            <div className="bg-poster-dark text-white p-6 rounded-lg font-mono text-sm mb-8 overflow-x-auto">
+              <div className="flex gap-2 mb-4 opacity-50">
+                <div className="w-2 h-2 rounded-full bg-red-400" />
+                <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                <div className="w-2 h-2 rounded-full bg-green-400" />
+              </div>
+              <div className="text-accent-light flex gap-2">
+                <span className="opacity-40">01</span>
+                <span>import &#123; extractRDF &#125; from "wrx";</span>
+              </div>
+              <div className="text-white/60 flex gap-2">
+                <span className="opacity-40">02</span>
+                <span>const res = await extractRDF(uri);</span>
+              </div>
+            </div>
+            <a href="https://github.com/cedricdcc/wrx" target="_blank" rel="noopener noreferrer" className="w-full py-4 bg-accent text-white font-bold uppercase tracking-widest hover:opacity-90 transition-opacity rounded flex items-center justify-center gap-3">
+              GitHub Repository <ArrowRight size={18} />
+            </a>
+          </div>
+        </div>
+
+        <div className="mt-20 pt-10 border-t border-accent/10 flex flex-col md:flex-row justify-between items-center gap-6">
+          <span className="font-mono text-[10px] uppercase text-poster-dark/40 tracking-[0.3em]">
+            WRX // RADICAL TRANSPARENCY APPROACH
+          </span>
+          <div className="flex gap-4">
+            <div className="w-8 h-px bg-accent/20 self-center" />
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <span className="text-[10px] font-bold text-accent uppercase tracking-widest italic">Live Processing</span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </section>
+  );
+
+  const sandboxSection = (
+    <section id="sandbox" key="sandbox" className="relative min-h-screen w-full flex flex-col items-center justify-start z-40 bg-poster-bg pt-20 pb-20 border-t border-accent/10">
+      <div className="w-full max-w-7xl px-8">
+        <TryOutSection />
+      </div>
+    </section>
+  );
 
   return (
     <div ref={containerRef} className="relative min-h-screen bg-poster-bg text-poster-dark selection:bg-accent selection:text-white">
@@ -1772,97 +1908,24 @@ export default function App() {
         </div>
       </section>
 
-      {/* Problem Section */}
-      <ProblemSection />
-
-      <StrategiesSection />
-
-      {/* Roadmap Section */}
-      <RoadmapSection />
-
-      {/* Result Section */}
-      <section className="relative py-24 md:py-32 w-full flex items-center justify-center z-40 bg-poster-bg border-t border-accent/10">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className="w-full max-w-5xl px-8"
-        >
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
-              <div>
-                <span className="text-accent font-black uppercase text-xs tracking-widest block mb-4">THE RESULT</span>
-                <h2 className="text-4xl md:text-6xl font-black text-poster-dark tracking-tighter">
-                  True<br />Interoperability
-                </h2>
-              </div>
-              <p className="text-[#666] leading-relaxed">
-                A foundation for evolving, scalable data ecosystems across heterogeneous sources.
-                Each step scored on reliability, provenance, and conversion metadata.
-              </p>
-              <div className="flex gap-4">
-                <div className="p-4 bg-accent/5 border border-accent/10 rounded-lg flex-1">
-                  <div className="flex items-center gap-2 text-accent mb-2 font-bold text-sm tracking-tight">
-                    <Zap size={16} /> Measurable
-                  </div>
-                  <div className="text-[10px] text-poster-dark/50 uppercase font-mono">Real-time scoring</div>
-                </div>
-                <div className="p-4 bg-accent/5 border border-accent/10 rounded-lg flex-1">
-                  <div className="flex items-center gap-2 text-accent mb-2 font-bold text-sm tracking-tight">
-                    <Layers size={16} /> Standardized
-                  </div>
-                  <div className="text-[10px] text-poster-dark/50 uppercase font-mono">Open protocols</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="strategy-card-blueprint p-8 md:p-12 rounded-2xl">
-              <h3 className="font-bold mb-6 flex items-center gap-2 text-poster-dark">
-                <Code2 className="text-accent" /> Start Discovery
-              </h3>
-              <div className="bg-poster-dark text-white p-6 rounded-lg font-mono text-sm mb-8 overflow-x-auto">
-                <div className="flex gap-2 mb-4 opacity-50">
-                  <div className="w-2 h-2 rounded-full bg-red-400" />
-                  <div className="w-2 h-2 rounded-full bg-yellow-400" />
-                  <div className="w-2 h-2 rounded-full bg-green-400" />
-                </div>
-                <div className="text-accent-light flex gap-2">
-                  <span className="opacity-40">01</span>
-                  <span>import &#123; extractRDF &#125; from "wrx";</span>
-                </div>
-                <div className="text-white/60 flex gap-2">
-                  <span className="opacity-40">02</span>
-                  <span>const res = await extractRDF(uri);</span>
-                </div>
-              </div>
-              <a href="https://github.com/cedricdcc/wrx" target="_blank" rel="noopener noreferrer" className="w-full py-4 bg-accent text-white font-bold uppercase tracking-widest hover:opacity-90 transition-opacity rounded flex items-center justify-center gap-3">
-                GitHub Repository <ArrowRight size={18} />
-              </a>
-            </div>
-          </div>
-
-          <div className="mt-20 pt-10 border-t border-accent/10 flex flex-col md:flex-row justify-between items-center gap-6">
-            <span className="font-mono text-[10px] uppercase text-poster-dark/40 tracking-[0.3em]">
-              WRX // RADICAL TRANSPARENCY APPROACH
-            </span>
-            <div className="flex gap-4">
-              <div className="w-8 h-px bg-accent/20 self-center" />
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                <span className="text-[10px] font-bold text-accent uppercase tracking-widest italic">Live Processing</span>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* Try It Out Section */}
-      <section id="sandbox" className="relative min-h-screen w-full flex flex-col items-center justify-start z-40 bg-poster-bg pt-20 pb-20 border-t border-accent/10">
-        <div className="w-full max-w-7xl px-8">
-          <TryOutSection />
-        </div>
-      </section>
+      {/* Render sections conditionally based on returning visitor status */}
+      {isReturningVisitor ? (
+        <>
+          {sandboxSection}
+          {problemSection}
+          {strategiesSection}
+          {roadmapSection}
+          {resultSection}
+        </>
+      ) : (
+        <>
+          {problemSection}
+          {strategiesSection}
+          {roadmapSection}
+          {resultSection}
+          {sandboxSection}
+        </>
+      )}
     </div>
   );
 }

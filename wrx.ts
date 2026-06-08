@@ -87,13 +87,13 @@ export async function extractLinkRelations(uri: string): Promise<LinkRelationObs
   return collectLinkRelationsForUri(uri)
 }
 
-function collectProfileValues(relations: LinkRelationObservation[]): string[] {
+export function collectProfileValues(relations: LinkRelationObservation[]): string[] {
   const profiles = new Set<string>()
   for (const relation of relations) {
     if (relation.rel === 'profile') {
       profiles.add(relation.href)
     }
-    for (const option of relation.options) {
+    for (const option of relation.options ?? []) {
       const optionName = (option.name ?? '').toLowerCase()
       const optionValue = (option.value ?? '').trim()
       if (optionName === 'profile' && optionValue) {
