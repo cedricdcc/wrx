@@ -29,7 +29,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import KnowledgeGraph from "./components/KnowledgeGraph";
-import CascadeVisualizerHUD from "./components/CascadeVisualizerHUD";
 import { extractRDF, extractLinkRelations, extractAllRDF, collectProfileValues } from "wrx";
 import * as N3 from "n3";
 import { QueryEngine } from "@comunica/query-sparql-rdfjs";
@@ -1853,59 +1852,47 @@ export default function App() {
       </div>
 
       {/* Hero Section */}
-      <section className="relative min-h-screen z-20 flex items-center justify-center pt-28 pb-16 px-8 max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-12 gap-12 items-center w-full">
-          {/* Left Column: Copy & Actions */}
-          <motion.div
-            initial={{ opacity: 0, x: -35 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="lg:col-span-4 flex flex-col items-start text-left space-y-6"
-          >
-            <div className="flex justify-center">
-              <span className="text-accent font-black tracking-widest uppercase text-[10px] border border-accent/20 px-3.5 py-1.5 rounded-full bg-accent/5 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                WRX Discovery Framework
-              </span>
-            </div>
-            <h1 className="text-5xl md:text-7xl font-black tracking-tighter leading-[0.95] text-poster-dark">
-              Findable is <br />
-              <span className="text-accent">not Explorable.</span>
-            </h1>
-            <p className="text-poster-dark/75 text-base md:text-lg max-w-xl font-medium leading-relaxed">
-              Standard web clients stall because URLs rarely reveal where RDF metadata lives.
-            </p>
-            <p className="text-poster-dark/60 text-sm md:text-base max-w-xl leading-relaxed">
-              <strong>WRX</strong> traverses standard web protocols automatically—from content negotiation to external linksets and sitemaps—turning any raw URL into a traversable knowledge graph.
-            </p>
-            <div className="flex flex-wrap gap-4 pt-4 w-full">
-              <a
-                href="#sandbox"
-                className="px-6 py-3.5 bg-accent text-white font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-accent/20 cursor-pointer"
-              >
-                <Play size={12} fill="white" /> Launch Sandbox
-              </a>
-              <a
-                href="https://cedricdcc.github.io/papers/wrx/wrx.pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-6 py-3.5 border border-poster-dark/20 hover:bg-poster-dark/5 text-poster-dark font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
-              >
-                <BookOpen size={12} /> Read Paper
-              </a>
-            </div>
-          </motion.div>
+      <section className="relative min-h-screen z-20 flex flex-col items-center justify-center pt-28 pb-16 px-8 max-w-7xl mx-auto w-full">
 
-          {/* Right Column: Visualizer HUD */}
-          <motion.div
-            initial={{ opacity: 0, x: 35 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-            className="lg:col-span-8 w-full flex justify-center"
+        {/* Video Explainer Player - Center aligned & Large (max-w-5xl) */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
+          className="w-full max-w-5xl rounded-3xl overflow-hidden border border-accent/20 shadow-2xl shadow-accent/15 bg-white relative p-1.5 backdrop-blur-md mb-10"
+        >
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full aspect-video rounded-2xl bg-[#f8fafc] object-cover"
+            src="/assets/wrx_explainer.mp4"
+          />
+        </motion.div>
+
+        {/* Action Buttons Centered Below Video */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+          className="flex flex-wrap justify-center gap-4 w-full"
+        >
+          <a
+            href="#sandbox"
+            className="px-8 py-4 bg-accent text-white font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-accent/20 cursor-pointer"
           >
-            <CascadeVisualizerHUD />
-          </motion.div>
-        </div>
+            <Play size={12} fill="white" /> Launch Sandbox
+          </a>
+          <a
+            href="https://cedricdcc.github.io/papers/wrx/wrx.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-8 py-4 border border-poster-dark/20 hover:bg-poster-dark/5 text-poster-dark font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <BookOpen size={12} /> Read Paper
+          </a>
+        </motion.div>
       </section>
 
       {/* Render sections conditionally based on returning visitor status */}
