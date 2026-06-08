@@ -1867,7 +1867,7 @@ export default function App() {
             muted
             playsInline
             className="w-full aspect-video rounded-2xl bg-[#f8fafc] object-cover"
-            src="/assets/wrx_explainer.mp4"
+            src="./assets/wrx_explainer.mp4"
           />
         </motion.div>
 
