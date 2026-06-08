@@ -1854,22 +1854,18 @@ export default function App() {
       {/* Hero Section */}
       <section className="relative min-h-screen z-20 flex flex-col items-center justify-center pt-28 pb-16 px-8 max-w-7xl mx-auto w-full">
 
-        {/* Video Explainer Player - Center aligned & Large (max-w-5xl) */}
-        <motion.div
+        {/* Video Explainer Player - Center aligned & Large (max-w-7xl) */}
+        <motion.video
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
-          className="w-full max-w-5xl rounded-3xl overflow-hidden border border-accent/20 shadow-2xl shadow-accent/15 bg-white relative p-1.5 backdrop-blur-md mb-10"
-        >
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full aspect-video rounded-2xl bg-[#f8fafc] object-cover"
-            src="./assets/wrx_explainer.mp4"
-          />
-        </motion.div>
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full max-w-7xl aspect-video rounded-3xl bg-[#f8fafc] object-cover shadow-2xl shadow-accent/10 mb-10"
+          src="./assets/wrx_explainer.mp4"
+        />
 
         {/* Action Buttons Centered Below Video */}
         <motion.div
