@@ -322,11 +322,10 @@ const StrategiesSection = () => {
                 <button
                   key={s.source}
                   onClick={() => setSelectedStrategy(s)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg border text-xs font-medium flex items-center justify-between transition-all duration-200 ${
-                    isImplemented
+                  className={`w-full text-left px-3 py-2.5 rounded-lg border text-xs font-medium flex items-center justify-between transition-all duration-200 ${isImplemented
                       ? "bg-accent/5 hover:bg-accent/10 border-accent/20 text-poster-dark hover:border-accent"
                       : "bg-poster-bg/50 hover:bg-poster-bg border-dashed border-accent/10 text-poster-dark/60 hover:border-accent/30"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className={`p-1 rounded ${isImplemented ? "bg-accent/10 text-accent" : "bg-poster-dark/5 text-poster-dark/40"}`}>
@@ -427,11 +426,10 @@ const StrategiesSection = () => {
             >
               {/* Header */}
               <div className="flex items-start gap-4 mb-6">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                  IMPLEMENTED_STRATEGY_IDS.includes(selectedStrategy.source)
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${IMPLEMENTED_STRATEGY_IDS.includes(selectedStrategy.source)
                     ? "bg-accent/10 text-accent border border-accent/20"
                     : "bg-poster-dark/5 text-poster-dark/40 border border-poster-dark/10"
-                }`}>
+                  }`}>
                   {(() => {
                     const Icon = STRATEGY_ICONS[selectedStrategy.source] || Search;
                     return <Icon size={24} />;
@@ -442,11 +440,10 @@ const StrategiesSection = () => {
                     <span className="font-mono text-[10px] font-black uppercase tracking-widest text-accent">
                       Quadrant {selectedStrategy.quadrant}
                     </span>
-                    <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider ${
-                      IMPLEMENTED_STRATEGY_IDS.includes(selectedStrategy.source)
+                    <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider ${IMPLEMENTED_STRATEGY_IDS.includes(selectedStrategy.source)
                         ? "bg-green-500/10 text-green-600"
                         : "bg-amber-500/10 text-amber-600"
-                    }`}>
+                      }`}>
                       {IMPLEMENTED_STRATEGY_IDS.includes(selectedStrategy.source) ? "Implemented / Active" : "Roadmap / Planned"}
                     </span>
                   </div>
@@ -617,11 +614,10 @@ const RoadmapSection = () => {
             <button
               key={q.id}
               onClick={() => setActiveTab(q.id)}
-              className={`p-5 rounded-2xl text-left border transition-all duration-300 ${
-                isSelected
+              className={`p-5 rounded-2xl text-left border transition-all duration-300 ${isSelected
                   ? "bg-white border-accent shadow-lg shadow-accent/5 ring-1 ring-accent/10 scale-[1.02]"
                   : "bg-white/40 border-accent/10 hover:border-accent/30 hover:bg-white/70"
-              }`}
+                }`}
             >
               <div className="text-[9px] font-mono font-black uppercase tracking-wider text-poster-dark/40 mb-1 flex items-center justify-between">
                 <span>Rank {q.rank}</span>
@@ -632,9 +628,8 @@ const RoadmapSection = () => {
               </h4>
               <div className="w-full bg-poster-dark/5 rounded-full h-1.5 mb-2 overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${
-                    q.id === 1 ? "bg-accent" : q.id === 3 ? "bg-teal-500" : q.id === 2 ? "bg-blue-500" : "bg-indigo-500"
-                  }`}
+                  className={`h-full rounded-full ${q.id === 1 ? "bg-accent" : q.id === 3 ? "bg-teal-500" : q.id === 2 ? "bg-blue-500" : "bg-indigo-500"
+                    }`}
                   style={{ width: `${qPercent}%` }}
                 />
               </div>
@@ -680,11 +675,10 @@ const RoadmapSection = () => {
             return (
               <div key={s.source} className="relative group">
                 {/* Connector Dot */}
-                <div className={`absolute -left-[33px] md:-left-[41px] top-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors duration-300 ${
-                  isImplemented
+                <div className={`absolute -left-[33px] md:-left-[41px] top-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors duration-300 ${isImplemented
                     ? "bg-white border-green-500 text-green-500"
                     : "bg-white border-amber-500/40 text-amber-500/40 group-hover:border-amber-500"
-                }`}>
+                  }`}>
                   {isImplemented ? <Check size={10} strokeWidth={3} /> : <Clock size={10} />}
                 </div>
 
@@ -791,7 +785,7 @@ function convertRelationsToTriples(relations: any[], sourceUri: string): any[] {
     const options = relation.options ?? [];
     for (const option of options) {
       const optionNodeId = `_:b_opt_${Math.random().toString(36).substring(2, 9)}`;
-      
+
       triples.push({
         subject: blankNodeId,
         predicate: `${xhtml}option`,
@@ -937,7 +931,7 @@ const TryOutSection = () => {
           return [];
         }) : Promise.resolve([])
       ]);
-      
+
       const overview = allRdfResult as any;
       const hasRdf = !!(overview && overview.found && overview.found.length > 0);
       const hasLinks = !!(linkRelations && linkRelations.length > 0);
@@ -956,10 +950,10 @@ const TryOutSection = () => {
 
       if (hasRdf && overview && overview.found) {
         for (const item of overview.found) {
-          const contentStr = typeof item.content === 'string' 
-            ? item.content 
+          const contentStr = typeof item.content === 'string'
+            ? item.content
             : JSON.stringify(item.content);
-          
+
           if (!primaryRawContent) {
             primaryRawContent = contentStr;
             primarySource = item.source || 'Content Negotiation';
@@ -968,7 +962,7 @@ const TryOutSection = () => {
           }
 
           const parsedTriples = await parseRdfToTriples(contentStr, item.format || item.mime || '', item.url || uriToFetch);
-          
+
           // Store under this strategy
           const srcKey = item.source || 'content-negotiation';
           if (!triplesMap[srcKey]) triplesMap[srcKey] = [];
@@ -993,7 +987,7 @@ const TryOutSection = () => {
         const relationTriples = convertRelationsToTriples(linkRelations, uriToFetch);
         extendedLinksCount = relationTriples.length;
         triplesMap['extended-links'] = relationTriples;
-        
+
         relationTriples.forEach((rt: any) => {
           if (!allMergedTriples.some(t => t.subject === rt.subject && t.predicate === rt.predicate && t.object === rt.object)) {
             allMergedTriples.push(rt);
@@ -1243,7 +1237,7 @@ const TryOutSection = () => {
                     try {
                       const urlObj = new URL(prof);
                       label = urlObj.hash ? urlObj.hash.substring(1) : urlObj.pathname.split('/').filter(Boolean).pop() || prof;
-                    } catch (e) {}
+                    } catch (e) { }
                     return (
                       <a
                         key={idx}
@@ -1510,9 +1504,9 @@ const TryOutSection = () => {
                                   <td className="p-4 font-sans font-semibold text-poster-dark/70 text-xs">
                                     Q{step.quadrant}: {
                                       step.quadrant === 1 ? "Resource-Direct" :
-                                      step.quadrant === 2 ? "Resource-Inferenced" :
-                                      step.quadrant === 3 ? "Domain-Direct" :
-                                      "Domain-Inferenced"
+                                        step.quadrant === 2 ? "Resource-Inferenced" :
+                                          step.quadrant === 3 ? "Domain-Direct" :
+                                            "Domain-Inferenced"
                                     }
                                   </td>
                                   <td className="p-4">
@@ -1736,6 +1730,133 @@ export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReturningVisitor, setIsReturningVisitor] = useState(false);
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [activeSection, setActiveSection] = useState<'intro' | 'problem' | 'cascade' | 'graph' | 'outro'>('intro');
+  const [isPaused, setIsPaused] = useState(false);
+  const [progress, setProgress] = useState<Record<string, number>>({ intro: 0, problem: 0, cascade: 0, graph: 0, outro: 0 });
+  const [isCopied, setIsCopied] = useState(false);
+
+  const SECTIONS = [
+    {
+      id: 'intro' as const,
+      label: 'Intro',
+      start: 0,
+      end: 4.0,
+      highlight: 3.33,
+    },
+    {
+      id: 'problem' as const,
+      label: 'Problem',
+      start: 4.0,
+      end: 17.5,
+      highlight: 12.83,
+    },
+    {
+      id: 'cascade' as const,
+      label: 'Cascade Pipeline',
+      start: 17.5,
+      end: 29.5,
+      highlight: 28.83,
+    },
+    {
+      id: 'graph' as const,
+      label: 'Knowledge Graph',
+      start: 29.5,
+      end: 39.5,
+      highlight: 38.67,
+    },
+    {
+      id: 'outro' as const,
+      label: 'Get Started',
+      start: 39.5,
+      end: 45.5,
+      highlight: 45.0,
+    },
+  ];
+
+  const handleTimeUpdate = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const time = video.currentTime;
+    
+    // Find which section we are in
+    const currentSec = SECTIONS.find(s => time >= s.start && time < s.end) || SECTIONS[SECTIONS.length - 1];
+    setActiveSection(currentSec.id);
+
+    // Update progress for all sections
+    const newProgress = { intro: 0, problem: 0, cascade: 0, graph: 0, outro: 0 };
+    SECTIONS.forEach(s => {
+      if (time >= s.end) {
+        newProgress[s.id] = 100;
+      } else if (time >= s.start && time < s.end) {
+        const duration = s.end - s.start;
+        const elapsed = time - s.start;
+        newProgress[s.id] = (elapsed / duration) * 100;
+      } else {
+        newProgress[s.id] = 0;
+      }
+    });
+    setProgress(newProgress);
+  };
+
+  const handleTabClick = (secId: typeof SECTIONS[number]['id']) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const targetSec = SECTIONS.find(s => s.id === secId);
+    if (!targetSec) return;
+
+    if (activeSection === secId) {
+      if (video.paused) {
+        video.play().catch(() => {});
+        setIsPaused(false);
+      } else {
+        video.pause();
+        setIsPaused(true);
+      }
+    } else {
+      video.currentTime = targetSec.highlight;
+      video.pause();
+      setIsPaused(true);
+      setActiveSection(secId);
+
+      const newProgress = { intro: 0, problem: 0, cascade: 0, graph: 0, outro: 0 };
+      SECTIONS.forEach(s => {
+        if (targetSec.highlight >= s.end) {
+          newProgress[s.id] = 100;
+        } else if (targetSec.highlight >= s.start && targetSec.highlight < s.end) {
+          const duration = s.end - s.start;
+          const elapsed = targetSec.highlight - s.start;
+          newProgress[s.id] = (elapsed / duration) * 100;
+        } else {
+          newProgress[s.id] = 0;
+        }
+      });
+      setProgress(newProgress);
+    }
+  };
+
+  const togglePlayPause = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play().catch(() => {});
+      setIsPaused(false);
+    } else {
+      video.pause();
+      setIsPaused(true);
+    }
+  };
+
+  const handlePlay = () => {
+    setIsPaused(false);
+  };
+
+  const handlePause = () => {
+    setIsPaused(true);
+  };
+
   useEffect(() => {
     const hasVisited = localStorage.getItem("visited_wrx");
     if (hasVisited) {
@@ -1748,7 +1869,7 @@ export default function App() {
   const problemSection = <ProblemSection key="problem" />;
   const strategiesSection = <StrategiesSection key="strategies" />;
   const roadmapSection = <RoadmapSection key="roadmap" />;
-  
+
   const resultSection = (
     <section key="result" className="relative py-24 md:py-32 w-full flex items-center justify-center z-40 bg-poster-bg border-t border-accent/10">
       <motion.div
@@ -1854,41 +1975,202 @@ export default function App() {
       {/* Hero Section */}
       <section className="relative min-h-screen z-20 flex flex-col items-center justify-center pt-28 pb-16 px-8 max-w-7xl mx-auto w-full">
 
+        {/* Sleek Tab Bar (above video) */}
+        <div className="w-full max-w-7xl flex flex-wrap justify-between items-center mb-6 gap-2 border-b border-accent/10 pb-4">
+          <div className="flex flex-wrap gap-2 md:gap-4 w-full justify-between">
+            {SECTIONS.map((sec) => {
+              const isActive = activeSection === sec.id;
+              return (
+                <button
+                  key={sec.id}
+                  onClick={() => handleTabClick(sec.id)}
+                  className={`flex-1 min-w-[120px] text-left p-3 rounded-xl transition-all duration-300 ${
+                    isActive 
+                      ? 'bg-accent/5 border border-accent/20 text-poster-dark' 
+                      : 'bg-transparent border border-transparent text-poster-dark/50 hover:text-poster-dark'
+                  }`}
+                >
+                  <div className="font-sans font-bold text-xs uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span>{sec.label}</span>
+                    {isActive && (
+                      <span className="text-[10px] text-accent font-black uppercase">
+                        {isPaused ? 'Paused' : 'Playing'}
+                      </span>
+                    )}
+                  </div>
+                  {/* Progress Line */}
+                  <div className="w-full h-1 bg-accent/10 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-accent transition-all duration-100 ease-out" 
+                      style={{ width: `${progress[sec.id]}%` }}
+                    />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Video Explainer Player - Center aligned & Large (max-w-7xl) */}
-        <motion.video
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full max-w-7xl aspect-video rounded-3xl bg-[#f8fafc] object-cover shadow-2xl shadow-accent/10 mb-10"
-          src="./assets/wrx_explainer.mp4"
-        />
+        <div className="relative w-full max-w-7xl aspect-video rounded-3xl bg-[#f8fafc] shadow-2xl shadow-accent/10 mb-10 overflow-hidden group">
+          <video
+            ref={videoRef}
+            autoPlay
+            loop
+            muted
+            playsInline
+            onTimeUpdate={handleTimeUpdate}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onClick={togglePlayPause}
+            className="w-full h-full object-cover cursor-pointer"
+            src="./assets/wrx_explainer.mp4"
+          />
+          {/* Pause overlay icon */}
+          {isPaused && (
+            <div 
+              onClick={togglePlayPause}
+              className="absolute inset-0 bg-black/25 flex items-center justify-center cursor-pointer transition-opacity duration-300"
+            >
+              <motion.div 
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="w-20 h-20 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-poster-dark shadow-xl"
+              >
+                <Play size={32} className="ml-1" fill="currentColor" />
+              </motion.div>
+            </div>
+          )}
+        </div>
 
         {/* Action Buttons Centered Below Video */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
-          className="flex flex-wrap justify-center gap-4 w-full"
-        >
-          <a
-            href="#sandbox"
-            className="px-8 py-4 bg-accent text-white font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-accent/20 cursor-pointer"
-          >
-            <Play size={12} fill="white" /> Launch Sandbox
-          </a>
-          <a
-            href="https://cedricdcc.github.io/papers/wrx/wrx.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-8 py-4 border border-poster-dark/20 hover:bg-poster-dark/5 text-poster-dark font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <BookOpen size={12} /> Read Paper
-          </a>
-        </motion.div>
+        <div className="w-full flex justify-center min-h-[64px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeSection}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-wrap justify-center gap-4 w-full"
+            >
+              {activeSection === 'intro' && (
+                <>
+                  <a
+                    href="#sandbox"
+                    className="px-8 py-4 bg-accent text-white font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-accent/20 cursor-pointer"
+                  >
+                    <Play size={12} fill="white" /> Try Demo
+                  </a>
+                  <a
+                    href="https://github.com/cedricdcc/wrx"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-8 py-4 border border-poster-dark/20 hover:bg-poster-dark/5 text-poster-dark font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Code2 size={12} /> GitHub Repository
+                  </a>
+                </>
+              )}
+
+              {activeSection === 'problem' && (
+                <>
+                  <a
+                    href="https://cedricdcc.github.io/papers/wrx/wrx.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-8 py-4 bg-accent text-white font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-accent/20 cursor-pointer"
+                  >
+                    <BookOpen size={12} /> Read Paper (PDF)
+                  </a>
+                  <button
+                    onClick={() => {
+                      const video = videoRef.current;
+                      if (video) {
+                        video.currentTime = 17.5; // Jump to Cascade section
+                        video.play().catch(() => {});
+                        setIsPaused(false);
+                      }
+                    }}
+                    className="px-8 py-4 border border-poster-dark/20 hover:bg-poster-dark/5 text-poster-dark font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <ChevronRight size={12} /> How WRX Solves It
+                  </button>
+                </>
+              )}
+
+              {activeSection === 'cascade' && (
+                <>
+                  <a
+                    href="#sandbox"
+                    className="px-8 py-4 bg-accent text-white font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-accent/20 cursor-pointer"
+                  >
+                    <Play size={12} fill="white" /> Try Demo
+                  </a>
+                  <a
+                    href="#solution"
+                    className="px-8 py-4 border border-poster-dark/20 hover:bg-poster-dark/5 text-poster-dark font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Layers size={12} /> View Mappings Schema
+                  </a>
+                </>
+              )}
+
+              {activeSection === 'graph' && (
+                <>
+                  <button
+                    onClick={() => {
+                      const el = document.getElementById('sandbox');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                    className="px-8 py-4 bg-accent text-white font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-accent/20 cursor-pointer"
+                  >
+                    <Play size={12} fill="white" /> Try Demo
+                  </button>
+                  <a
+                    href="https://www.w3.org/RDF/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-8 py-4 border border-poster-dark/20 hover:bg-poster-dark/5 text-poster-dark font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <BookOpen size={12} /> Learn RDF Specs
+                  </a>
+                </>
+              )}
+
+              {activeSection === 'outro' && (
+                <>
+                  <a
+                    href="#sandbox"
+                    className="px-8 py-4 bg-accent text-white font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-accent/20 cursor-pointer"
+                  >
+                    <Play size={12} fill="white" /> Try Demo
+                  </a>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('bun add wrx');
+                      setIsCopied(true);
+                      setTimeout(() => setIsCopied(false), 2000);
+                    }}
+                    className="px-8 py-4 border border-poster-dark/20 hover:bg-poster-dark/5 text-poster-dark font-bold uppercase tracking-widest text-xs rounded-lg flex items-center gap-2 transition-colors cursor-pointer min-w-[220px] justify-center"
+                  >
+                    {isCopied ? (
+                      <>
+                        <Check size={12} className="text-green-500" /> Copied!
+                      </>
+                    ) : (
+                      <>
+                        <TerminalSquare size={12} /> Copy Install Command
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </section>
 
       {/* Render sections conditionally based on returning visitor status */}

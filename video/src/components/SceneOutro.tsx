@@ -59,7 +59,7 @@ export const SceneOutro: React.FC = () => {
           textAlign: "center",
         }}
       >
-        True <span style={{ color: "#3d7a8d" }}>Interoperability.</span>
+        Improved <span style={{ color: "#3d7a8d" }}>Explorability.</span>
       </div>
 
       {/* Code Snippet Container */}
@@ -111,7 +111,7 @@ export const SceneOutro: React.FC = () => {
           gap: "10px",
         }}
       >
-        github.com/cedricdcc/wrx
+        Get started by clicking the <span style={{ color: "#3d7a8d" }}>Sandbox button</span> below.
       </div>
     </AbsoluteFill>
   );

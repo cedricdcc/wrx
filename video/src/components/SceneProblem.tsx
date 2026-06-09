@@ -17,20 +17,20 @@ export const SceneProblem: React.FC = () => {
     extrapolateRight: "clamp",
   });
 
-  // 2. Transition-out (345 - 360 frames): scale down to 0.8, fade out
-  const outScale = interpolate(frame, [345, 360], [1, 0.8], {
+  // 2. Transition-out (390 - 405 frames): scale down to 0.8, fade out
+  const outScale = interpolate(frame, [390, 405], [1, 0.8], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.bezier(0.16, 1, 0.3, 1),
   });
 
-  const outOpacity = interpolate(frame, [345, 360], [1, 0], {
+  const outOpacity = interpolate(frame, [390, 405], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  const finalScale = frame >= 345 ? outScale : sceneScale;
-  const finalOpacity = frame >= 345 ? outOpacity : sceneOpacity;
+  const finalScale = frame >= 390 ? outScale : sceneScale;
+  const finalOpacity = frame >= 390 ? outOpacity : sceneOpacity;
 
   // Bezier curve calculations
   const getBezierPoint = (
@@ -136,7 +136,7 @@ export const SceneProblem: React.FC = () => {
           letterSpacing: "-0.03em",
         }}
       >
-        How a Machine <span style={{ color: "#ef4444" }}>fails</span> to read Linked Data
+        How a Machine <span style={{ color: "#ef4444" }}>fails</span> to retrieve Linked Open Data
       </h2>
       <p
         style={{
@@ -148,7 +148,8 @@ export const SceneProblem: React.FC = () => {
           opacity: subtitleOpacity,
         }}
       >
-        Because scientists and developers implement diverse specifications unequally and without documentation, standard clients are left blind.
+        Because developers implement diverse specifications unequally and without documentation, standard clients are left blind.
+        Unable to explore the distributed semantic web.
       </p>
 
       {/* Main visual wrapper */}

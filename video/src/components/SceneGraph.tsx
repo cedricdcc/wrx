@@ -53,6 +53,8 @@ export const SceneGraph: React.FC = () => {
     { id: "o1", label: "dcat:Dataset", type: "class", x: 780, y: 150, delay: 55 },
     { id: "o2", label: "org:VLIZ", type: "uri", x: 180, y: 180, delay: 95 },
     { id: "o3", label: "Plankton Obs...", type: "literal", x: 480, y: 480, delay: 135 },
+    { id: "o4", label: "orcid:0000-0002-8614-2390", type: "uri", x: 180, y: 420, delay: 175 },
+    { id: "o5", label: '"North Sea"', type: "literal", x: 780, y: 450, delay: 215 },
   ];
 
   // Graph edges details
@@ -60,6 +62,8 @@ export const SceneGraph: React.FC = () => {
     { fromId: "s", toId: "o1", label: "rdf:type", delay: 40 },
     { fromId: "s", toId: "o2", label: "dct:publisher", delay: 80 },
     { fromId: "s", toId: "o3", label: "dct:title", delay: 120 },
+    { fromId: "s", toId: "o4", label: "dct:creator", delay: 160 },
+    { fromId: "s", toId: "o5", label: "dct:spatial", delay: 200 },
   ];
 
   const getStyleForType = (type: "subject" | "uri" | "class" | "literal") => {

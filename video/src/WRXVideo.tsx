@@ -17,23 +17,23 @@ export const WRXVideo: React.FC = () => {
         <SceneIntro />
       </Sequence>
 
-      {/* Scene 2: The Problem (4s - 16s / frames 120 - 480) */}
-      <Sequence from={120} durationInFrames={360}>
+      {/* Scene 2: The Problem (4s - 17.5s / frames 120 - 525) */}
+      <Sequence from={120} durationInFrames={405}>
         <SceneProblem />
       </Sequence>
 
-      {/* Scene 3: The Cascade Matrix (16s - 28s / frames 480 - 840) */}
-      <Sequence from={480} durationInFrames={360}>
+      {/* Scene 3: The Cascade Matrix (17.5s - 29.5s / frames 525 - 885) */}
+      <Sequence from={525} durationInFrames={360}>
         <SceneCascade />
       </Sequence>
 
-      {/* Scene 4: Knowledge Graph (28s - 38s / frames 840 - 1140) */}
-      <Sequence from={840} durationInFrames={300}>
+      {/* Scene 4: Knowledge Graph (29.5s - 39.5s / frames 885 - 1185) */}
+      <Sequence from={885} durationInFrames={300}>
         <SceneGraph />
       </Sequence>
 
-      {/* Scene 5: Outro & Code (38s - 44s / frames 1140 - 1320) */}
-      <Sequence from={1140} durationInFrames={180}>
+      {/* Scene 5: Outro & Code (39.5s - 45.5s / frames 1185 - 1365) */}
+      <Sequence from={1185} durationInFrames={180}>
         <SceneOutro />
       </Sequence>
     </AbsoluteFill>

@@ -8,7 +8,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="WRXVideo"
         component={WRXVideo}
-        durationInFrames={1320}
+        durationInFrames={1365}
         fps={30}
         width={1920}
         height={1080}
