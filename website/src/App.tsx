@@ -33,6 +33,7 @@ import { extractRDF, extractLinkRelations, extractAllRDF, collectProfileValues }
 import * as N3 from "n3";
 import { QueryEngine } from "@comunica/query-sparql-rdfjs";
 import jsonld from "jsonld";
+import videoSrc from "./assets/wrx_explainer.mp4";
 
 import {
   contentNegotiationStrategy,
@@ -2024,7 +2025,7 @@ export default function App() {
             onPause={handlePause}
             onClick={togglePlayPause}
             className="w-full h-full object-cover cursor-pointer"
-            src="./assets/wrx_explainer.mp4"
+            src={videoSrc}
           />
           {/* Pause overlay icon */}
           {isPaused && (
