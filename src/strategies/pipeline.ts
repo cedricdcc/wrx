@@ -100,6 +100,7 @@ export interface DiscoveryOverview {
   notFound: Array<ExtractedRDF['source']>
   contentNegotiations: ContentNegotiationProbe[]
   trace: StrategyTraceStep[]
+  provenance?: string
 }
 
 async function runHeadSignpostingPreflight(uri: string): Promise<ExtractedRDF | null> {
@@ -230,12 +231,123 @@ async function probeContentNegotiation(uri: string): Promise<ContentNegotiationP
   return probes
 }
 
+function toCamelCase(str: string): string {
+  return str.replace(/-([a-z])/g, (_, g) => g.toUpperCase())
+}
+
+function toPlanClassName(source: string): string {
+  const camel = toCamelCase(source)
+  return camel.charAt(0).toUpperCase() + camel.slice(1) + 'Plan'
+}
+
+function escapeTurtleLiteral(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')
+}
+
+export function generateProvenanceGraph(
+  uri: string,
+  hits: ExtractedRDF[],
+  trace: Array<{ source: string; label: string; found: boolean }>,
+  startTime: Date,
+  endTime: Date
+): string {
+  const agentUuid = globalThis.crypto.randomUUID()
+  const overallActivityUuid = globalThis.crypto.randomUUID()
+
+  let ttl = `@prefix prov: <http://www.w3.org/ns/prov#> .\n` +
+            `@prefix wrx: <https://github.com/cedricdcc/wrx/vocab#> .\n` +
+            `@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n` +
+            `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n`
+
+  // 1. Assert Target Resource
+  ttl += `<${uri}> a prov:Entity, wrx:TargetResource .\n\n`
+
+  // 2. Assert Software Agent
+  ttl += `<urn:uuid:${agentUuid}> a prov:SoftwareAgent ;\n` +
+         `    rdfs:label "wrx.js library v1.0.0" .\n\n`
+
+  // 3. Assert Overall Extraction Activity
+  ttl += `<urn:uuid:${overallActivityUuid}> a prov:Activity, wrx:ExtractionActivity ;\n` +
+         `    prov:startedAtTime "${startTime.toISOString()}"^^xsd:dateTime ;\n` +
+         `    prov:endedAtTime "${endTime.toISOString()}"^^xsd:dateTime ;\n` +
+         `    prov:wasAssociatedWith <urn:uuid:${agentUuid}> ;\n` +
+         `    prov:used <${uri}> .\n\n`
+
+  // 4. Assert Strategy Runs
+  for (const step of trace) {
+    const stratActivityUuid = globalThis.crypto.randomUUID()
+    const planClassName = toPlanClassName(step.source)
+    const strat = STRATEGY_MAP[step.source]
+    const specLink = strat?.specLink || ''
+
+    // Plan definition
+    ttl += `<https://github.com/cedricdcc/wrx/vocab#${planClassName}> a prov:Plan, wrx:${planClassName} ;\n` +
+           `    rdfs:label "${step.label} Strategy Specification"` +
+           (specLink ? ` ;\n    rdfs:seeAlso <${specLink}>` : '') +
+           ` .\n\n`
+
+    // Strategy execution activity
+    ttl += `<urn:uuid:${stratActivityUuid}> a prov:Activity, wrx:StrategyActivity ;\n` +
+           `    prov:wasAssociatedWith <urn:uuid:${agentUuid}> ;\n` +
+           `    prov:used <${uri}> ;\n` +
+           `    prov:qualifiedAssociation [\n` +
+           `        a prov:Association ;\n` +
+           `        prov:agent <urn:uuid:${agentUuid}> ;\n` +
+           `        prov:hadPlan <https://github.com/cedricdcc/wrx/vocab#${planClassName}>\n` +
+           `    ] .\n\n`
+
+    // Find all hits matching this strategy
+    const matchingHits = hits.filter((h) => h.source === step.source)
+    for (const hit of matchingHits) {
+      const targetUrl = hit.url || uri
+      
+      // If we fetched a different URL (like describedby or sitemap url)
+      if (targetUrl !== uri) {
+        const intermediateEntityUuid = globalThis.crypto.randomUUID()
+        ttl += `<urn:uuid:${intermediateEntityUuid}> a prov:Entity ;\n` +
+               `    prov:wasDerivedFrom <${uri}> .\n\n`
+        ttl += `<${targetUrl}> a prov:Entity ;\n` +
+               `    prov:wasDerivedFrom <urn:uuid:${intermediateEntityUuid}> .\n\n`
+      }
+
+      // Assert the final Extracted Metadata entity
+      ttl += `<${uri}#extracted-metadata> a prov:Entity, wrx:ExtractedMetadata ;\n` +
+             `    prov:value "${escapeTurtleLiteral(hit.content)}" ;\n` +
+             `    prov:generatedAtTime "${endTime.toISOString()}"^^xsd:dateTime ;\n` +
+             `    prov:wasGeneratedBy <urn:uuid:${overallActivityUuid}> ;\n` +
+             `    prov:wasDerivedFrom <${targetUrl}> ;\n` +
+             `    prov:qualifiedDerivation [\n` +
+             `        a prov:Derivation ;\n` +
+             `        prov:entity <${uri}> ;\n` +
+             `        prov:hadActivity <urn:uuid:${stratActivityUuid}> ;\n` +
+             `        prov:hadPlan <https://github.com/cedricdcc/wrx/vocab#${planClassName}>\n` +
+             `    ] .\n\n`
+    }
+  }
+
+  return ttl
+}
+
 export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null> {
+  const startTime = new Date()
+  const tried: Array<{ source: ExtractedRDF['source']; label: string; found: boolean }> = []
+
+  const recordStep = (source: ExtractedRDF['source'], label: string, found: boolean) => {
+    tried.push({ source, label, found })
+  }
+
   logger.info({ uri }, 'Starting RDF discovery cascade (first hit mode) for URI: %s', uri)
   const headPreflightHit = await runHeadSignpostingPreflight(uri)
   if (headPreflightHit) {
     const stage = headPreflightHit.source ? STRATEGY_MAP[headPreflightHit.source]?.stage : undefined;
     logger.info({ uri, source: headPreflightHit.source, url: headPreflightHit.url, stage }, 'Preflight hit found via %s from %s', headPreflightHit.source, headPreflightHit.url)
+    
+    const source = headPreflightHit.source || 'signposting-link-header'
+    const label = STRATEGY_MAP[source]?.label || source
+    recordStep(source, label, true)
+    
+    const endTime = new Date()
+    headPreflightHit.provenance = generateProvenanceGraph(uri, [headPreflightHit], tried, startTime, endTime)
     return headPreflightHit
   }
 
@@ -245,7 +357,7 @@ export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null
   const ctxAny = ctx as any
   if (ctxAny.initialOk && isRDFMime(ctxAny.initialMime)) {
     logger.info({ uri, source: 'content-negotiation', url: uri, stage: 1 }, 'Initial response is already RDF (MIME: %s) via content-negotiation', ctxAny.initialMime)
-    return {
+    const hit = {
       content: ctxAny.initialBody,
       mime: ctxAny.initialMime,
       format: ctxAny.initialMime as ExtractedRDF['format'],
@@ -253,30 +365,41 @@ export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null
       url: uri,
       uri,
     } as ExtractedRDF
+    recordStep('content-negotiation', contentNegotiationStrategy.label, true)
+    
+    const endTime = new Date()
+    hit.provenance = generateProvenanceGraph(uri, [hit], tried, startTime, endTime)
+    return hit
+  } else {
+    recordStep('content-negotiation', contentNegotiationStrategy.label, false)
   }
 
   logger.debug({ uri }, 'Iterating over strategies in cascade order...')
-  // Iterate over STRATEGY_ORDER to try each strategy in order
   for (const source of STRATEGY_ORDER) {
     const strat = STRATEGY_MAP[source]
     if (!strat) continue
-
-    // content-negotiation is already handled as initial fetch above,
-    // but we can let it run if it's there
     if (source === 'content-negotiation') continue
 
-    // For linkset, it might need to try multiple candidate URLs (headers + html)
     if (source === 'linkset') {
       const candidates = collectLinksetCandidates(uri, ctx.bodyText, ctx.linkHeader)
       logger.debug({ uri, strategy: source, stage: strat.stage, candidatesCount: candidates.length }, 'Evaluating strategy: %s (Stage %s) with %d candidates', strat.label, strat.stage, candidates.length)
+      let linksetHit: ExtractedRDF | null = null
       for (const linksetUrl of candidates) {
         logger.debug({ uri, strategy: source, stage: strat.stage, linksetUrl }, 'Trying linkset candidate URL: %s', linksetUrl)
-        const linksetHit = await linksetStrategy.executeFirstHit({ ...ctx, linksetUrl })
+        linksetHit = await linksetStrategy.executeFirstHit({ ...ctx, linksetUrl })
         if (linksetHit) {
           linksetHit.uri = uri
-          logger.info({ uri, strategy: source, stage: strat.stage, url: linksetHit.url }, 'Strategy %s succeeded. Found RDF: %s', strat.label, linksetHit.url)
-          return linksetHit
+          break
         }
+      }
+      if (linksetHit) {
+        logger.info({ uri, strategy: source, stage: strat.stage, url: linksetHit.url }, 'Strategy %s succeeded. Found RDF: %s', strat.label, linksetHit.url)
+        recordStep('linkset', strat.label, true)
+        const endTime = new Date()
+        linksetHit.provenance = generateProvenanceGraph(uri, [linksetHit], tried, startTime, endTime)
+        return linksetHit
+      } else {
+        recordStep('linkset', strat.label, false)
       }
       continue
     }
@@ -287,12 +410,17 @@ export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null
       if (hit) {
         hit.uri = uri
         logger.info({ uri, strategy: source, stage: strat.stage, url: hit.url }, 'Strategy %s succeeded. Found RDF: %s', strat.label, hit.url)
+        recordStep(source, strat.label, true)
+        const endTime = new Date()
+        hit.provenance = generateProvenanceGraph(uri, [hit], tried, startTime, endTime)
         return hit
+      } else {
+        recordStep(source, strat.label, false)
       }
       logger.debug({ uri, strategy: source, stage: strat.stage }, 'Strategy %s yielded no RDF', strat.label)
     } catch (err: any) {
       logger.debug({ uri, strategy: source, stage: strat.stage, error: err.message }, 'Strategy %s failed with error: %s', strat.label, err.message)
-      // Ignore and continue
+      recordStep(source, strat.label, false)
     }
   }
 
@@ -301,7 +429,8 @@ export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null
 }
 
 export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
-  logger.info({ uri }, 'Starting exhaustive RDF discovery cascade for URI: %s', uri)
+  const startTime = new Date()
+  logger.info({ uri }, 'Starting RDF discovery cascade (exhaustive mode) for URI: %s', uri)
   logger.debug({ uri }, 'Building strategy context for exhaustive run...')
   const ctx = await buildStrategyContext(uri, true)
   const found: ExtractedRDF[] = []
@@ -402,5 +531,9 @@ export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
   })
 
   logger.info({ uri, totalFound: found.length }, 'Exhaustive RDF discovery cascade complete. Total unique RDF sources found: %d', found.length)
-  return { found, notFound, contentNegotiations, trace }
+
+  const endTime = new Date()
+  const provenance = generateProvenanceGraph(uri, found, trace, startTime, endTime)
+
+  return { found, notFound, contentNegotiations, trace, provenance }
 }

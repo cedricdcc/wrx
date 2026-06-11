@@ -15,6 +15,7 @@ export interface ExtractedRDF {
   format?: RDFFormat
   source?: string
   url?: string
+  provenance?: string
 }
 
 export interface RDFOverview {
@@ -22,6 +23,7 @@ export interface RDFOverview {
   uri?: string
   format?: RDFFormat
   mime?: string
+  provenance?: string
 }
 
 export interface ContentNegotiationResult {
@@ -59,6 +61,7 @@ export interface ParsedCliArgs {
   input?: string
   output?: string
   profile?: boolean
+  provenance?: boolean
   report?: boolean
   verbose?: boolean
 }

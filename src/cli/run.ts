@@ -133,11 +133,12 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
   let mergedDocuments: ExtractedRDF[] = [];
   let mergedRelations: LinkRelationObservation[] = [];
 
+  let overview: any = null;
   if (parsed.all || parsed.report) {
-    const overview = (await extractAllRDF(url)) as RDFOverview & { found?: ExtractedRDF[] };
+    overview = await extractAllRDF(url);
 
     mergedRelations = parsed.extendLinks || parsed.profile || parsed.all || parsed.report ? await collectLinkRelationsForUri(url) : [];
-    mergedDocuments = (overview.found ?? []).filter((doc) => Boolean(doc));
+    mergedDocuments = (overview.found ?? []).filter((doc: any) => Boolean(doc));
 
     outputDocument = selectPrimaryRdf(overview);
   } else {
@@ -167,5 +168,32 @@ export async function runWrxCli(args: string[] = process.argv.slice(2)): Promise
     }
   } catch (error) {
     logger.error(error instanceof Error ? error.message : String(error));
+  }
+
+  if (parsed.provenance) {
+    if (parsed.all || parsed.report) {
+      if (!parsed.output) {
+        for (const doc of mergedDocuments) {
+          console.log(`\n--- Extracted RDF (${doc.source}) ---`);
+          console.log(doc.content);
+        }
+      }
+      console.log('\n--- W3C PROV-O Provenance Graph ---');
+      if (overview && overview.provenance) {
+        console.log(overview.provenance);
+      }
+    } else {
+      if (outputDocument) {
+        if (!parsed.output) {
+          console.log(outputDocument.content);
+        }
+        console.log('\n--- W3C PROV-O Provenance Graph ---');
+        if (outputDocument.provenance) {
+          console.log(outputDocument.provenance);
+        }
+      } else {
+        console.log('No RDF was discovered, thus no provenance was generated.');
+      }
+    }
   }
 }

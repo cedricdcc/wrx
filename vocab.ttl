@@ -1,0 +1,197 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix wrx: <https://github.com/cedricdcc/wrx/vocab#> .
+
+<https://github.com/cedricdcc/wrx/vocab#> a owl:Ontology ;
+    rdfs:label "wrx Vocabulary" ;
+    rdfs:comment "Vocabulary for describing Web Resource Extraction and its provenance details using W3C PROV-O." ;
+    owl:imports <http://www.w3.org/ns/prov#> .
+
+# --- Classes ---
+
+wrx:TargetResource a owl:Class ;
+    rdfs:label "Target Resource" ;
+    rdfs:comment "The initial URL or web resource requested to be harvested/extracted." ;
+    rdfs:subClassOf prov:Entity .
+
+wrx:ExtractedMetadata a owl:Class ;
+    rdfs:label "Extracted Metadata" ;
+    rdfs:comment "The final metadata payload successfully extracted from a target resource." ;
+    rdfs:subClassOf prov:Entity .
+
+wrx:StrategyActivity a owl:Class ;
+    rdfs:label "Strategy Activity" ;
+    rdfs:comment "An activity representing the execution of a single discovery strategy." ;
+    rdfs:subClassOf prov:Activity .
+
+wrx:ExtractionActivity a owl:Class ;
+    rdfs:label "Extraction Activity" ;
+    rdfs:comment "The overall activity representing a complete run of the wrx cascading extraction pipeline." ;
+    rdfs:subClassOf prov:Activity .
+
+# --- Document Types ---
+
+wrx:HtmlDocument a owl:Class ;
+    rdfs:label "HTML Document" ;
+    rdfs:comment "An HTML document retrieved during discovery." ;
+    rdfs:subClassOf prov:Entity .
+
+wrx:LinksetDocument a owl:Class ;
+    rdfs:label "Linkset Document" ;
+    rdfs:comment "A document conforming to RFC 9264 containing link sets." ;
+    rdfs:subClassOf prov:Entity .
+
+wrx:SitemapDocument a owl:Class ;
+    rdfs:label "Sitemap Document" ;
+    rdfs:comment "A sitemap XML file containing metadata references." ;
+    rdfs:subClassOf prov:Entity .
+
+# --- Core Strategy Plan Subclasses ---
+
+wrx:StrategyPlan a owl:Class ;
+    rdfs:label "Strategy Plan" ;
+    rdfs:comment "A generic plan/specification governing an RDF extraction strategy." ;
+    rdfs:subClassOf prov:Plan .
+
+# --- Specific Strategy Plans ---
+
+# Stage 1: Direct RDF
+wrx:ContentNegotiationPlan a owl:Class ;
+    rdfs:label "Content Negotiation Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.w3.org/Protocols/rfc2616/rfc2616-sec12.html> .
+
+wrx:SignpostingLinkHeaderPlan a owl:Class ;
+    rdfs:label "Signposting Link Header Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.rfc-editor.org/rfc/rfc8288.html> .
+
+wrx:SignpostingHtmlLinkPlan a owl:Class ;
+    rdfs:label "Signposting HTML Link Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.w3.org/TR/html5/> .
+
+wrx:EmbeddedScriptPlan a owl:Class ;
+    rdfs:label "Embedded Script Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan .
+
+wrx:LinksetPlan a owl:Class ;
+    rdfs:label "Linkset Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.rfc-editor.org/rfc/rfc9264.html> .
+
+wrx:DcatCatalogPlan a owl:Class ;
+    rdfs:label "DCAT Catalog Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.w3.org/TR/vocab-dcat-2/> .
+
+wrx:WellKnownPlan a owl:Class ;
+    rdfs:label "Well-Known Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.rfc-editor.org/rfc/rfc5785.html> .
+
+wrx:ResourceMapPlan a owl:Class ;
+    rdfs:label "Resource Map Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan .
+
+# Stage 2: Semantic Uplifting
+wrx:HtmlLinksPlan a owl:Class ;
+    rdfs:label "HTML Links Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan .
+
+wrx:RdfaPlan a owl:Class ;
+    rdfs:label "RDFa Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.w3.org/TR/rdfa-core/> .
+
+wrx:MicrodataPlan a owl:Class ;
+    rdfs:label "Microdata Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.w3.org/TR/microdata/> .
+
+wrx:OpenGraphPlan a owl:Class ;
+    rdfs:label "Open Graph Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://ogp.me/> .
+
+wrx:DublinCorePlan a owl:Class ;
+    rdfs:label "Dublin Core Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.dublincore.org/specifications/dublin-core/dcmi-terms/> .
+
+wrx:CanonicalPlan a owl:Class ;
+    rdfs:label "Canonical Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.rfc-editor.org/rfc/rfc6596.html> .
+
+wrx:HttpLinkRelationsPlan a owl:Class ;
+    rdfs:label "HTTP Link Relations Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.rfc-editor.org/rfc/rfc8288.html> .
+
+wrx:SitemapSignpostingPlan a owl:Class ;
+    rdfs:label "Sitemap Signposting Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <http://sitemaps.org/> .
+
+wrx:RssFeedPlan a owl:Class ;
+    rdfs:label "RSS Feed Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan .
+
+wrx:AtomFeedPlan a owl:Class ;
+    rdfs:label "Atom Feed Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.rfc-editor.org/rfc/rfc4287.html> .
+
+wrx:ManifestPlan a owl:Class ;
+    rdfs:label "Manifest Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.w3.org/TR/appmanifest/> .
+
+wrx:ApiDiscoveryPlan a owl:Class ;
+    rdfs:label "API Discovery Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan .
+
+# Stage 3: Inferred / Reasoned
+wrx:FoafPlan a owl:Class ;
+    rdfs:label "FOAF Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <http://xmlns.com/foaf/spec/> .
+
+wrx:SameAsPlan a owl:Class ;
+    rdfs:label "Same As Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.w3.org/TR/owl-ref/#sameAs-statement> .
+
+wrx:SkosPlan a owl:Class ;
+    rdfs:label "SKOS Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.w3.org/TR/skos-reference/> .
+
+wrx:RdfCollectionsPlan a owl:Class ;
+    rdfs:label "RDF Collections Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan .
+
+wrx:ProvenancePlan a owl:Class ;
+    rdfs:label "Provenance Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan ;
+    rdfs:seeAlso <https://www.w3.org/TR/prov-o/> .
+
+wrx:CollectionMembershipPlan a owl:Class ;
+    rdfs:label "Collection Membership Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan .
+
+wrx:PaginationPlan a owl:Class ;
+    rdfs:label "Pagination Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan .
+
+wrx:ReverseLinksPlan a owl:Class ;
+    rdfs:label "Reverse Links Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan .
+
+wrx:CircularGraphsPlan a owl:Class ;
+    rdfs:label "Circular Graphs Plan" ;
+    rdfs:subClassOf wrx:StrategyPlan .

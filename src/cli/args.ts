@@ -6,6 +6,7 @@ Options:
   -h, --help           Show this help message
   --all                Explore all extraction strategies
   --extend-links       Print modeled link relations
+  -p, --provenance     Print W3C PROV-O provenance
   --profile            Print discovered profile URIs
   --report             Print the discovery trace in a tabular format
   -v, --verbose        Enable verbose debug logging
@@ -26,6 +27,7 @@ export function parseCliArgs(args: string[]): ParsedCliArgs {
   let help = false;
   let output: string | undefined;
   let profile = false;
+  let provenance = false;
   let report = false;
   let verbose = false;
   let input: string | undefined;
@@ -47,6 +49,10 @@ export function parseCliArgs(args: string[]): ParsedCliArgs {
     }
     if (arg === '--profile') {
       profile = true;
+      continue;
+    }
+    if (arg === '--provenance' || arg === '-p') {
+      provenance = true;
       continue;
     }
     if (arg === '--report') {
@@ -76,5 +82,5 @@ export function parseCliArgs(args: string[]): ParsedCliArgs {
     throw new Error(`Unexpected extra positional argument: ${arg}`);
   }
 
-  return { all, extendLinks, help, input, output, profile, report, verbose };
+  return { all, extendLinks, help, input, output, profile, provenance, report, verbose };
 }

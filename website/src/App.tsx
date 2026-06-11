@@ -24,11 +24,17 @@ import {
   BookOpen,
   Activity,
   ChevronDown,
-  Check
+  Check,
+  Copy,
+  Download,
+  X,
+  GitBranch,
+  FileType2
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import KnowledgeGraph from "./components/KnowledgeGraph";
+import ProvenanceGraph, { type ProvNode } from "./components/ProvenanceGraph";
 import { extractRDF, extractLinkRelations, extractAllRDF, collectProfileValues, addLogListener, removeLogListener } from "wrx";
 import * as N3 from "n3";
 import { QueryEngine } from "@comunica/query-sparql-rdfjs";
@@ -854,6 +860,12 @@ const TryOutSection = () => {
   const [strategyTriples, setStrategyTriples] = useState<Record<string, any[]>>({});
   const [selectedReportStrategy, setSelectedReportStrategy] = useState<any | null>(null);
 
+  // Provenance States
+  const [reportSubTab, setReportSubTab] = useState<'cascade' | 'provenance' | 'turtle'>('cascade');
+  const [provenanceTurtle, setProvenanceTurtle] = useState<string>('');
+  const [selectedProvNode, setSelectedProvNode] = useState<ProvNode | null>(null);
+  const [turtleCopied, setTurtleCopied] = useState(false);
+
   // Live Execution Logs
   const [logs, setLogs] = useState<any[]>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -1007,6 +1019,9 @@ const TryOutSection = () => {
       } else {
         setTraceSteps([]);
       }
+
+      // Capture PROV-O provenance Turtle
+      setProvenanceTurtle(overview?.provenance || '');
 
       const newData = {
         metadata: {
@@ -1478,135 +1493,438 @@ const TryOutSection = () => {
                 )}
 
                 {activeTab === 'report' && (
-                  <div className="flex-1 flex flex-col bg-[#f8fafc] p-6 md:p-8 overflow-y-auto max-h-[650px]">
-                    {/* Report Overview Dashboard */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                      <div className="bg-white border border-accent/15 rounded-xl p-5 shadow-sm flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-                          <Activity size={20} />
-                        </div>
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wider text-poster-dark/50 font-bold mb-0.5">Cascade Flow</div>
-                          <div className="font-sans font-black text-lg text-poster-dark">
-                            {traceSteps.length > 0 ? traceSteps.length : 29} checked
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white border border-accent/15 rounded-xl p-5 shadow-sm flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-600">
-                          <CheckCircle2 size={20} />
-                        </div>
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wider text-poster-dark/50 font-bold mb-0.5">Successful Hits</div>
-                          <div className="font-sans font-black text-lg text-poster-dark">
-                            {traceSteps.filter(t => t.found).length} strategies
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white border border-accent/15 rounded-xl p-5 shadow-sm flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-teal-500/10 flex items-center justify-center text-teal-600">
-                          <Layers size={20} />
-                        </div>
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wider text-poster-dark/50 font-bold mb-0.5">Extracted Graph</div>
-                          <div className="font-sans font-black text-lg text-poster-dark">
-                            {result?.triples?.length || 0} triples
-                          </div>
-                        </div>
-                      </div>
+                  <div className="flex-1 flex flex-col bg-[#f8fafc] overflow-hidden">
+                    {/* Sub-tab bar */}
+                    <div className="flex items-center gap-2 px-6 pt-5 pb-3 border-b border-accent/10 bg-white/60">
+                      {[
+                        { id: 'cascade' as const, label: 'Cascade Trace', icon: Activity },
+                        { id: 'provenance' as const, label: 'PROV-O Graph', icon: GitBranch },
+                        { id: 'turtle' as const, label: 'Raw Turtle', icon: FileType2 },
+                      ].map(tab => (
+                        <button
+                          key={tab.id}
+                          onClick={() => { setReportSubTab(tab.id); setSelectedProvNode(null); }}
+                          className={`px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
+                            reportSubTab === tab.id
+                              ? 'bg-accent text-white shadow-md shadow-accent/20'
+                              : 'bg-white text-poster-dark/50 border border-accent/10 hover:border-accent/30 hover:text-poster-dark'
+                          }`}
+                        >
+                          <tab.icon size={13} />
+                          {tab.label}
+                        </button>
+                      ))}
+                      {provenanceTurtle && (
+                        <span className="ml-auto px-2 py-0.5 bg-green-500/10 text-green-600 rounded text-[9px] font-bold uppercase tracking-wider">
+                          Provenance Available
+                        </span>
+                      )}
                     </div>
 
-                    {/* Trace Steps Table */}
-                    <div className="bg-white border border-accent/15 rounded-2xl overflow-hidden shadow-sm">
-                      <div className="p-5 border-b border-accent/10 bg-white flex items-center justify-between">
-                        <h4 className="font-sans font-black text-poster-dark tracking-tight text-sm">
-                          Cascade Strategy Trace Steps
-                        </h4>
-                        <span className="px-2 py-0.5 bg-accent/5 rounded text-[10px] font-mono font-bold text-accent uppercase tracking-wider">
-                          --all active
-                        </span>
-                      </div>
+                    {/* Sub-tab content */}
+                    <div className="flex-1 overflow-auto relative">
 
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs font-sans border-collapse">
-                          <thead className="bg-[#f8fafc] text-poster-dark/50 border-b border-accent/10 font-bold font-mono">
-                            <tr>
-                              <th className="p-4 uppercase tracking-wider text-[10px]">Step</th>
-                              <th className="p-4 uppercase tracking-wider text-[10px]">Strategy</th>
-                              <th className="p-4 uppercase tracking-wider text-[10px]">Quadrant</th>
-                              <th className="p-4 uppercase tracking-wider text-[10px]">Status</th>
-                              <th className="p-4 uppercase tracking-wider text-[10px]">Payload</th>
-                              <th className="p-4 uppercase tracking-wider text-[10px]">Triples</th>
-                              <th className="p-4 uppercase tracking-wider text-[10px] text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-accent/5">
-                            {traceSteps.map((step) => {
-                              const strategyTriplesCount = (strategyTriples[step.source] || []).length;
-                              return (
-                                <tr key={step.source} className="hover:bg-accent/5 transition-colors">
-                                  <td className="p-4 font-mono font-black text-poster-dark/50 text-[11px]">
-                                    Step 0{step.strategy || step.strategy === 0 ? step.strategy : step.index + 1}
-                                  </td>
-                                  <td className="p-4 font-sans font-bold text-poster-dark text-xs">
-                                    {step.label}
-                                  </td>
-                                  <td className="p-4 font-sans font-semibold text-poster-dark/70 text-xs">
-                                    Q{step.quadrant}: {
-                                      step.quadrant === 1 ? "Resource-Direct" :
-                                        step.quadrant === 2 ? "Resource-Inferenced" :
-                                          step.quadrant === 3 ? "Domain-Direct" :
-                                            "Domain-Inferenced"
+                      {/* ── Cascade Trace Sub-tab ── */}
+                      {reportSubTab === 'cascade' && (
+                        <div className="p-6 md:p-8 max-h-[600px] overflow-y-auto">
+                          {/* Report Overview Dashboard */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div className="bg-white border border-accent/15 rounded-xl p-5 shadow-sm flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+                                <Activity size={20} />
+                              </div>
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wider text-poster-dark/50 font-bold mb-0.5">Cascade Flow</div>
+                                <div className="font-sans font-black text-lg text-poster-dark">
+                                  {traceSteps.length > 0 ? traceSteps.length : 29} checked
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="bg-white border border-accent/15 rounded-xl p-5 shadow-sm flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-600">
+                                <CheckCircle2 size={20} />
+                              </div>
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wider text-poster-dark/50 font-bold mb-0.5">Successful Hits</div>
+                                <div className="font-sans font-black text-lg text-poster-dark">
+                                  {traceSteps.filter(t => t.found).length} strategies
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="bg-white border border-accent/15 rounded-xl p-5 shadow-sm flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-full bg-teal-500/10 flex items-center justify-center text-teal-600">
+                                <Layers size={20} />
+                              </div>
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wider text-poster-dark/50 font-bold mb-0.5">Extracted Graph</div>
+                                <div className="font-sans font-black text-lg text-poster-dark">
+                                  {result?.triples?.length || 0} triples
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Trace Steps Table */}
+                          <div className="bg-white border border-accent/15 rounded-2xl overflow-hidden shadow-sm">
+                            <div className="p-5 border-b border-accent/10 bg-white flex items-center justify-between">
+                              <h4 className="font-sans font-black text-poster-dark tracking-tight text-sm">
+                                Cascade Strategy Trace Steps
+                              </h4>
+                              <span className="px-2 py-0.5 bg-accent/5 rounded text-[10px] font-mono font-bold text-accent uppercase tracking-wider">
+                                --all active
+                              </span>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs font-sans border-collapse">
+                                <thead className="bg-[#f8fafc] text-poster-dark/50 border-b border-accent/10 font-bold font-mono">
+                                  <tr>
+                                    <th className="p-4 uppercase tracking-wider text-[10px]">Step</th>
+                                    <th className="p-4 uppercase tracking-wider text-[10px]">Strategy</th>
+                                    <th className="p-4 uppercase tracking-wider text-[10px]">Quadrant</th>
+                                    <th className="p-4 uppercase tracking-wider text-[10px]">Status</th>
+                                    <th className="p-4 uppercase tracking-wider text-[10px]">Payload</th>
+                                    <th className="p-4 uppercase tracking-wider text-[10px]">Triples</th>
+                                    <th className="p-4 uppercase tracking-wider text-[10px] text-right">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-accent/5">
+                                  {traceSteps.map((step) => {
+                                    const strategyTriplesCount = (strategyTriples[step.source] || []).length;
+                                    return (
+                                      <tr key={step.source} className="hover:bg-accent/5 transition-colors">
+                                        <td className="p-4 font-mono font-black text-poster-dark/50 text-[11px]">
+                                          Step 0{step.strategy || step.strategy === 0 ? step.strategy : step.index + 1}
+                                        </td>
+                                        <td className="p-4 font-sans font-bold text-poster-dark text-xs">
+                                          {step.label}
+                                        </td>
+                                        <td className="p-4 font-sans font-semibold text-poster-dark/70 text-xs">
+                                          Q{step.quadrant}: {
+                                            step.quadrant === 1 ? "Resource-Direct" :
+                                              step.quadrant === 2 ? "Resource-Inferenced" :
+                                                step.quadrant === 3 ? "Domain-Direct" :
+                                                  "Domain-Inferenced"
+                                          }
+                                        </td>
+                                        <td className="p-4">
+                                          {step.found ? (
+                                            <span className="px-2 py-0.5 bg-green-500/10 text-green-600 rounded-full text-[9px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                                              <span className="w-1 h-1 rounded-full bg-green-500" /> RDF Found
+                                            </span>
+                                          ) : (
+                                            <span className="px-2 py-0.5 bg-red-500/10 text-red-600 rounded-full text-[9px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                                              <span className="w-1 h-1 rounded-full bg-red-500" /> No RDF
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="p-4 font-mono font-bold text-poster-dark/70 text-[11px]">
+                                          {step.found && step.hits?.[0]?.chars
+                                            ? `${(step.hits[0].chars / 1024).toFixed(2)} KB`
+                                            : "-"}
+                                        </td>
+                                        <td className="p-4 font-mono font-bold text-[11px]">
+                                          {step.found ? (
+                                            <span className="text-accent">{strategyTriplesCount} triples</span>
+                                          ) : (
+                                            <span className="text-poster-dark/40">-</span>
+                                          )}
+                                        </td>
+                                        <td className="p-4 text-right">
+                                          {step.found && strategyTriplesCount > 0 ? (
+                                            <button
+                                              onClick={() => setSelectedReportStrategy(step)}
+                                              className="px-3 py-1.5 bg-accent hover:opacity-90 transition-opacity text-white text-[10px] font-bold uppercase tracking-widest rounded-md inline-flex items-center gap-1 shadow-sm font-sans"
+                                            >
+                                              View Triples
+                                            </button>
+                                          ) : (
+                                            <button
+                                              disabled
+                                              className="px-3 py-1.5 border border-slate-200 text-slate-400 text-[10px] font-bold uppercase tracking-widest rounded-md inline-flex items-center gap-1 cursor-not-allowed font-sans"
+                                            >
+                                              No Triples
+                                            </button>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── PROV-O Graph Sub-tab ── */}
+                      {reportSubTab === 'provenance' && (
+                        <div className="flex-1 relative" style={{ minHeight: '500px' }}>
+                          <ProvenanceGraph
+                            turtleString={provenanceTurtle}
+                            onNodeSelect={(node) => setSelectedProvNode(node)}
+                          />
+
+                          {/* Slide-out Detail Panel */}
+                          <AnimatePresence>
+                            {selectedProvNode && (
+                              <motion.div
+                                initial={{ x: 400, opacity: 0 }}
+                                animate={{ x: 0, opacity: 1 }}
+                                exit={{ x: 400, opacity: 0 }}
+                                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                                className="absolute top-0 right-0 h-full w-[380px] bg-white border-l border-accent/15 shadow-2xl z-30 flex flex-col overflow-hidden"
+                              >
+                                {/* Panel Header */}
+                                <div className="p-5 border-b border-accent/10 bg-[#f8fafc] flex items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider ${
+                                        selectedProvNode.type === 'Entity' ? 'bg-[#3d7a8d]/10 text-[#3d7a8d]' :
+                                        selectedProvNode.type === 'Activity' ? 'bg-[#64b5f6]/15 text-[#4a90c4]' :
+                                        selectedProvNode.type === 'Agent' ? 'bg-[#10b981]/10 text-[#0d9488]' :
+                                        'bg-[#f59e0b]/10 text-[#d97706]'
+                                      }`}>
+                                        {selectedProvNode.type}
+                                      </span>
+                                    </div>
+                                    <h4 className="font-sans font-black text-poster-dark text-sm tracking-tight leading-tight truncate" title={selectedProvNode.id}>
+                                      {selectedProvNode.label}
+                                    </h4>
+                                    <p className="text-[10px] font-mono text-poster-dark/40 mt-1 truncate" title={selectedProvNode.id}>
+                                      {selectedProvNode.id}
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => setSelectedProvNode(null)}
+                                    className="shrink-0 w-7 h-7 rounded-lg bg-poster-dark/5 hover:bg-poster-dark/10 flex items-center justify-center text-poster-dark/50 transition-colors"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+
+                                {/* Panel Body */}
+                                <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                                  {/* Properties table */}
+                                  <div>
+                                    <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-poster-dark/40 mb-2">Properties</div>
+                                    <div className="space-y-1.5">
+                                      {Object.entries(selectedProvNode.properties).map(([pred, values]) => {
+                                        const shortPred = pred.includes('#') ? pred.split('#').pop() : pred.split('/').pop();
+                                        const prefix = pred.includes('prov') ? 'prov:' : pred.includes('wrx') ? 'wrx:' : pred.includes('rdfs') ? 'rdfs:' : '';
+                                        return (
+                                          <div key={pred} className="bg-[#f8fafc] border border-accent/5 rounded-lg p-2.5">
+                                            <div className="text-[10px] font-mono font-bold text-accent mb-1">
+                                              {prefix}{shortPred}
+                                            </div>
+                                            {values.map((val, vi) => {
+                                              const isUri = val.startsWith('http') || val.startsWith('urn:');
+                                              const isTimestamp = val.includes('T') && val.includes(':') && (val.includes('Z') || val.includes('+'));
+                                              return (
+                                                <div key={vi} className="text-[11px] font-mono break-all leading-relaxed">
+                                                  {isUri ? (
+                                                    <a href={val} target="_blank" rel="noopener noreferrer" className="text-[#4a90c4] hover:underline">
+                                                      {val.length > 50 ? val.substring(0, 47) + '…' : val}
+                                                    </a>
+                                                  ) : isTimestamp ? (
+                                                    <span className="text-emerald-600 flex items-center gap-1.5">
+                                                      <Clock size={10} />
+                                                      {new Date(val).toLocaleString()}
+                                                    </span>
+                                                  ) : (
+                                                    <span className="text-poster-dark/70">
+                                                      {val.length > 80 ? val.substring(0, 77) + '…' : val}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+
+                                  {/* Spec Links */}
+                                  {selectedProvNode.properties['http://www.w3.org/2000/01/rdf-schema#seeAlso'] && (
+                                    <div>
+                                      <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-poster-dark/40 mb-2">Specification</div>
+                                      {selectedProvNode.properties['http://www.w3.org/2000/01/rdf-schema#seeAlso'].map((link, i) => (
+                                        <a
+                                          key={i}
+                                          href={link}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-2 px-3 py-2 bg-accent/5 hover:bg-accent/10 border border-accent/10 rounded-lg text-[11px] font-bold text-accent transition-colors"
+                                        >
+                                          <BookOpen size={12} />
+                                          View Specification
+                                          <ExternalLink size={10} className="ml-auto opacity-50" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Raw Turtle Snippet */}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-poster-dark/40">Turtle Snippet</div>
+                                      <button
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(selectedProvNode.turtleSnippet);
+                                        }}
+                                        className="text-[9px] font-bold text-accent hover:text-accent/80 flex items-center gap-1 transition-colors"
+                                      >
+                                        <Copy size={10} /> Copy
+                                      </button>
+                                    </div>
+                                    <pre className="bg-[#0a0a0a] text-[#e2e8f0] text-[10px] font-mono p-3 rounded-lg overflow-x-auto max-h-[200px] overflow-y-auto leading-relaxed border border-slate-800">
+                                      {selectedProvNode.turtleSnippet}
+                                    </pre>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+
+                      {/* ── Raw Turtle Sub-tab ── */}
+                      {reportSubTab === 'turtle' && (
+                        <div className="flex-1 flex flex-col bg-[#0a0a0a]">
+                          {/* Toolbar */}
+                          <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#0d0d0d]">
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] font-mono font-bold text-white/40 uppercase tracking-widest">W3C PROV-O Turtle</span>
+                              {provenanceTurtle && (
+                                <span className="text-[9px] font-mono text-white/20">
+                                  {provenanceTurtle.split('\n').length} lines · {(provenanceTurtle.length / 1024).toFixed(1)} KB
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(provenanceTurtle);
+                                  setTurtleCopied(true);
+                                  setTimeout(() => setTurtleCopied(false), 2000);
+                                }}
+                                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+                              >
+                                {turtleCopied ? <><Check size={11} className="text-green-400" /> Copied!</> : <><Copy size={11} /> Copy</>}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const blob = new Blob([provenanceTurtle], { type: 'text/turtle' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  try {
+                                    const domain = new URL(uri).hostname.replace(/\./g, '_');
+                                    a.download = `wrx_provenance_${domain}.ttl`;
+                                  } catch {
+                                    a.download = 'wrx_provenance.ttl';
+                                  }
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  document.body.removeChild(a);
+                                  URL.revokeObjectURL(url);
+                                }}
+                                className="px-3 py-1.5 bg-accent/80 hover:bg-accent border border-accent/40 rounded-md text-[10px] font-bold text-white uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+                              >
+                                <Download size={11} /> Download .ttl
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Syntax-highlighted Turtle */}
+                          <div className="flex-1 overflow-auto p-6 max-h-[550px]">
+                            {provenanceTurtle ? (
+                              <pre className="text-xs font-mono leading-relaxed select-text">
+                                {provenanceTurtle.split('\n').map((line, i) => {
+                                  // Simple syntax highlighting
+                                  let highlighted = line;
+                                  // @prefix lines
+                                  if (line.trimStart().startsWith('@prefix')) {
+                                    return <div key={i} className="text-slate-500">{line}</div>;
+                                  }
+                                  // Empty lines
+                                  if (line.trim() === '') {
+                                    return <div key={i}>&nbsp;</div>;
+                                  }
+
+                                  // Tokenize and color
+                                  const parts: JSX.Element[] = [];
+                                  let remaining = line;
+                                  let partIdx = 0;
+
+                                  while (remaining.length > 0) {
+                                    // Leading whitespace
+                                    const wsMatch = remaining.match(/^(\s+)/);
+                                    if (wsMatch) {
+                                      parts.push(<span key={partIdx++}>{wsMatch[1]}</span>);
+                                      remaining = remaining.substring(wsMatch[1].length);
+                                      continue;
                                     }
-                                  </td>
-                                  <td className="p-4">
-                                    {step.found ? (
-                                      <span className="px-2 py-0.5 bg-green-500/10 text-green-600 rounded-full text-[9px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
-                                        <span className="w-1 h-1 rounded-full bg-green-500" /> RDF Found
-                                      </span>
-                                    ) : (
-                                      <span className="px-2 py-0.5 bg-red-500/10 text-red-600 rounded-full text-[9px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
-                                        <span className="w-1 h-1 rounded-full bg-red-500" /> No RDF
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="p-4 font-mono font-bold text-poster-dark/70 text-[11px]">
-                                    {step.found && step.hits?.[0]?.chars
-                                      ? `${(step.hits[0].chars / 1024).toFixed(2)} KB`
-                                      : "-"}
-                                  </td>
-                                  <td className="p-4 font-mono font-bold text-[11px]">
-                                    {step.found ? (
-                                      <span className="text-accent">{strategyTriplesCount} triples</span>
-                                    ) : (
-                                      <span className="text-poster-dark/40">-</span>
-                                    )}
-                                  </td>
-                                  <td className="p-4 text-right">
-                                    {step.found && strategyTriplesCount > 0 ? (
-                                      <button
-                                        onClick={() => setSelectedReportStrategy(step)}
-                                        className="px-3 py-1.5 bg-accent hover:opacity-90 transition-opacity text-white text-[10px] font-bold uppercase tracking-widest rounded-md inline-flex items-center gap-1 shadow-sm font-sans"
-                                      >
-                                        View Triples
-                                      </button>
-                                    ) : (
-                                      <button
-                                        disabled
-                                        className="px-3 py-1.5 border border-slate-200 text-slate-400 text-[10px] font-bold uppercase tracking-widest rounded-md inline-flex items-center gap-1 cursor-not-allowed font-sans"
-                                      >
-                                        No Triples
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                                    // URI <...>
+                                    const uriMatch = remaining.match(/^(<[^>]+>)/);
+                                    if (uriMatch) {
+                                      const uriStr = uriMatch[1];
+                                      const isProv = uriStr.includes('prov#');
+                                      const isWrx = uriStr.includes('wrx/vocab#');
+                                      const color = isProv ? 'text-[#64b5f6]' : isWrx ? 'text-[#f59e0b]' : 'text-[#3d7a8d]';
+                                      parts.push(<span key={partIdx++} className={color}>{uriStr}</span>);
+                                      remaining = remaining.substring(uriStr.length);
+                                      continue;
+                                    }
+                                    // Literal "..."
+                                    const litMatch = remaining.match(/^("[^"]*"(?:\^\^<[^>]+>)?)/);
+                                    if (litMatch) {
+                                      parts.push(<span key={partIdx++} className="text-green-400">{litMatch[1]}</span>);
+                                      remaining = remaining.substring(litMatch[1].length);
+                                      continue;
+                                    }
+                                    // 'a' keyword (rdf:type)
+                                    const aMatch = remaining.match(/^(a)(\s)/);
+                                    if (aMatch) {
+                                      parts.push(<span key={partIdx++} className="text-amber-400 font-bold">a</span>);
+                                      remaining = remaining.substring(1);
+                                      continue;
+                                    }
+                                    // Punctuation
+                                    const punctMatch = remaining.match(/^([.;,\[\]])/);
+                                    if (punctMatch) {
+                                      parts.push(<span key={partIdx++} className="text-slate-500">{punctMatch[1]}</span>);
+                                      remaining = remaining.substring(1);
+                                      continue;
+                                    }
+                                    // Prefixed names (prov:xxx, wrx:xxx, etc.)
+                                    const prefixMatch = remaining.match(/^([a-zA-Z][a-zA-Z0-9]*:[a-zA-Z][a-zA-Z0-9_-]*)/);
+                                    if (prefixMatch) {
+                                      const pfx = prefixMatch[1];
+                                      const color = pfx.startsWith('prov:') ? 'text-[#64b5f6]' : pfx.startsWith('wrx:') ? 'text-[#f59e0b]' : pfx.startsWith('xsd:') ? 'text-purple-400' : 'text-cyan-300';
+                                      parts.push(<span key={partIdx++} className={color}>{pfx}</span>);
+                                      remaining = remaining.substring(pfx.length);
+                                      continue;
+                                    }
+                                    // Fallback: next character
+                                    parts.push(<span key={partIdx++} className="text-white/70">{remaining[0]}</span>);
+                                    remaining = remaining.substring(1);
+                                  }
+
+                                  return <div key={i} className="hover:bg-white/5 transition-colors">{parts}</div>;
+                                })}
+                              </pre>
+                            ) : (
+                              <div className="text-white/30 italic text-center py-12 text-sm">
+                                No provenance Turtle available. Run an extraction to generate the PROV-O graph.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
