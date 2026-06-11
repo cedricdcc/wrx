@@ -34,14 +34,14 @@ We define the mapping of `wrx` core abstractions to PROV-O concepts as follows:
 Each of the seven cascading strategies in `wrx` has a unique extraction path. Below are the precise Turtle RDF templates that should be generated for each strategy to record their provenance.
 
 > [!NOTE]
-> We use the prefix `wrx: <https://github.com/cedricdcc/wrx/vocab#>` for project-specific terms.
+> We use the prefix `wrx: <https://cedricdcc.github.io/wrx/vocab.ttl#>` for project-specific terms.
 
 ### Strategy 1: Content Negotiation (RFC 7231)
 *The RDF is retrieved directly from the target URI using content type negotiation.*
 
 ```turtle
 @prefix prov: <http://www.w3.org/ns/prov#> .
-@prefix wrx: <https://github.com/cedricdcc/wrx/vocab#> .
+@prefix wrx: <https://cedricdcc.github.io/wrx/vocab.ttl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 # Target requested

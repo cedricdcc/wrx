@@ -255,7 +255,7 @@ export function generateProvenanceGraph(
   const overallActivityUuid = globalThis.crypto.randomUUID()
 
   let ttl = `@prefix prov: <http://www.w3.org/ns/prov#> .\n` +
-            `@prefix wrx: <https://github.com/cedricdcc/wrx/vocab#> .\n` +
+            `@prefix wrx: <https://cedricdcc.github.io/wrx/vocab.ttl#> .\n` +
             `@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n` +
             `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n`
 
@@ -281,7 +281,7 @@ export function generateProvenanceGraph(
     const specLink = strat?.specLink || ''
 
     // Plan definition
-    ttl += `<https://github.com/cedricdcc/wrx/vocab#${planClassName}> a prov:Plan, wrx:${planClassName} ;\n` +
+    ttl += `<https://cedricdcc.github.io/wrx/vocab.ttl#${planClassName}> a prov:Plan, wrx:${planClassName} ;\n` +
            `    rdfs:label "${step.label} Strategy Specification"` +
            (specLink ? ` ;\n    rdfs:seeAlso <${specLink}>` : '') +
            ` .\n\n`
@@ -293,7 +293,7 @@ export function generateProvenanceGraph(
            `    prov:qualifiedAssociation [\n` +
            `        a prov:Association ;\n` +
            `        prov:agent <urn:uuid:${agentUuid}> ;\n` +
-           `        prov:hadPlan <https://github.com/cedricdcc/wrx/vocab#${planClassName}>\n` +
+           `        prov:hadPlan <https://cedricdcc.github.io/wrx/vocab.ttl#${planClassName}>\n` +
            `    ] .\n\n`
 
     // Find all hits matching this strategy
@@ -320,7 +320,7 @@ export function generateProvenanceGraph(
              `        a prov:Derivation ;\n` +
              `        prov:entity <${uri}> ;\n` +
              `        prov:hadActivity <urn:uuid:${stratActivityUuid}> ;\n` +
-             `        prov:hadPlan <https://github.com/cedricdcc/wrx/vocab#${planClassName}>\n` +
+             `        prov:hadPlan <https://cedricdcc.github.io/wrx/vocab.ttl#${planClassName}>\n` +
              `    ] .\n\n`
     }
   }

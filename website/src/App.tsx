@@ -1711,7 +1711,7 @@ const TryOutSection = () => {
                                   <div>
                                     <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-poster-dark/40 mb-2">Properties</div>
                                     <div className="space-y-1.5">
-                                      {Object.entries(selectedProvNode.properties).map(([pred, values]) => {
+                                      {Object.entries(selectedProvNode.properties as Record<string, string[]>).map(([pred, values]) => {
                                         const shortPred = pred.includes('#') ? pred.split('#').pop() : pred.split('/').pop();
                                         const prefix = pred.includes('prov') ? 'prov:' : pred.includes('wrx') ? 'wrx:' : pred.includes('rdfs') ? 'rdfs:' : '';
                                         return (
@@ -1856,7 +1856,7 @@ const TryOutSection = () => {
                                   }
 
                                   // Tokenize and color
-                                  const parts: JSX.Element[] = [];
+                                  const parts: any[] = [];
                                   let remaining = line;
                                   let partIdx = 0;
 

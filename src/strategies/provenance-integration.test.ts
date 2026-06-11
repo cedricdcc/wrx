@@ -33,7 +33,7 @@ describe('PROV-O Provenance Tracking Integration', () => {
     
     // Check prefixes
     expect(prov).toContain('@prefix prov: <http://www.w3.org/ns/prov#>');
-    expect(prov).toContain('@prefix wrx: <https://github.com/cedricdcc/wrx/vocab#>');
+    expect(prov).toContain('@prefix wrx: <https://cedricdcc.github.io/wrx/vocab.ttl#>');
     expect(prov).toContain('@prefix xsd: <http://www.w3.org/2001/XMLSchema#>');
 
     // Check target resource assertion
@@ -78,7 +78,7 @@ describe('PROV-O Provenance Tracking Integration', () => {
 
     // Check prefixes
     expect(prov).toContain('@prefix prov: <http://www.w3.org/ns/prov#>');
-    expect(prov).toContain('@prefix wrx: <https://github.com/cedricdcc/wrx/vocab#>');
+    expect(prov).toContain('@prefix wrx: <https://cedricdcc.github.io/wrx/vocab.ttl#>');
 
     // Check target resource assertion
     expect(prov).toContain(`<${URI}> a prov:Entity, wrx:TargetResource .`);
@@ -87,6 +87,6 @@ describe('PROV-O Provenance Tracking Integration', () => {
     expect(prov).toContain('a prov:Activity, wrx:ExtractionActivity');
 
     // Check that conneg plan was instantiated
-    expect(prov).toContain('<https://github.com/cedricdcc/wrx/vocab#ContentNegotiationPlan> a prov:Plan, wrx:ContentNegotiationPlan');
+    expect(prov).toContain('<https://cedricdcc.github.io/wrx/vocab.ttl#ContentNegotiationPlan> a prov:Plan, wrx:ContentNegotiationPlan');
   });
 });
