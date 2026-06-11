@@ -67,7 +67,8 @@ function triggerListeners(event: LogEvent) {
 let pinoLogger: any = null;
 
 if (!isBrowser) {
-  import(/* @vite-ignore */ 'pino')
+  const pinoId = 'pino';
+  import(/* @vite-ignore */ pinoId)
     .then((pinoModule) => {
       const pino = pinoModule.default || pinoModule.pino || pinoModule;
       pinoLogger = pino({
