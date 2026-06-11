@@ -6,7 +6,7 @@ export class DcatCatalogStrategy implements DiscoveryStrategy {
   readonly source: ExtractedRDF['source'] = 'dcat-catalog' as any
   readonly location = 'Domain' as const
   readonly extraction = 'Direct' as const
-  readonly quadrant = 3 as const
+  readonly stage = 1 as const
   readonly specLink = 'https://www.w3.org/TR/vocab-dcat-2/'
   readonly standard = 'Data Catalog Vocabulary (DCAT)'
   readonly extraInfo = 'TODO: Query host/domain level DCAT portals directly to extract dataset metadata.'

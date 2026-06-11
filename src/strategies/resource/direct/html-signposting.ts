@@ -22,7 +22,7 @@ export class HtmlSignpostingStrategy implements DiscoveryStrategy {
   readonly source: ExtractedRDF['source'] = 'signposting-html-link'
   readonly location = 'Resource' as const
   readonly extraction = 'Direct' as const
-  readonly quadrant = 1 as const
+  readonly stage = 1 as const
   readonly specLink = 'https://datatracker.ietf.org/doc/html/rfc8288#section-3'
   readonly standard = 'RFC 8288 (Web Linking) - Section 3'
   readonly extraInfo = 'Extracts RDF by discovering link[rel=describedby] elements in HTML documents pointing directly to RDF descriptions.'

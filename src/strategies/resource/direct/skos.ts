@@ -5,8 +5,8 @@ export class SkosStrategy implements DiscoveryStrategy {
   readonly label = 'SKOS Relations'
   readonly source: ExtractedRDF['source'] = 'skos' as any
   readonly location = 'Resource' as const
-  readonly extraction = 'Direct' as const
-  readonly quadrant = 1 as const
+  readonly extraction = 'Reasoning' as const
+  readonly stage = 3 as const
   readonly specLink = 'https://www.w3.org/TR/skos-reference/'
   readonly standard = 'SKOS Simple Knowledge Organization System'
   readonly extraInfo = 'TODO: Discover concept scheme and term relationships via SKOS assertions in the RDF payload.'

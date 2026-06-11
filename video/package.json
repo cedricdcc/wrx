@@ -25,6 +25,7 @@
   "scripts": {
     "dev": "remotion studio",
     "build": "remotion bundle",
+    "render": "remotion render WRXVideo ../website/src/assets/wrx_explainer.mp4",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"
   },

@@ -60,8 +60,8 @@ export interface DiscoveryStrategy {
 
   /** Taxonomy categorization metadata */
   readonly location: 'Resource' | 'Domain' | 'Both'
-  readonly extraction: 'Direct' | 'Inferenced' | 'Both'
-  readonly quadrant: 1 | 2 | 3 | 4
+  readonly extraction: 'Direct' | 'Uplifting' | 'Reasoning'
+  readonly stage: 1 | 2 | 3
   readonly specLink?: string
   readonly standard?: string
   readonly extraInfo?: string

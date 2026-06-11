@@ -32,47 +32,44 @@ export const SceneCascade: React.FC = () => {
   const finalOpacity = frame >= 345 ? outOpacity : sceneOpacity;
 
   // 3. Timing for cascading phases
-  // Q1 active: 15-70. Fail at 70
-  // Cascade Q1 -> Q2: 70-85
-  // Q2 active: 85-140. Fail at 140
-  // Cascade Q2 -> Q3: 140-155
-  // Q3 active: 155-210. Fail at 210
-  // Cascade Q3 -> Q4: 210-225
-  // Q4 active: 225-275. Success at 275
+  // Stage 1 active: 15-110. Fail at 110
+  // Cascade Stage 1 -> Stage 2: 110-135
+  // Stage 2 active: 135-230. Success at 230
+  // Cascade Stage 2 -> Stage 3: 230-255
+  // Stage 3 active: 255-330. Success at 330
 
-  const getQuadState = (quadNum: number, currentFrame: number): "pending" | "active" | "failed" | "success" => {
-    if (quadNum === 1) {
+  const getStageState = (stageNum: number, currentFrame: number): "pending" | "active" | "failed" | "success" => {
+    if (stageNum === 1) {
       if (currentFrame < 15) return "pending";
-      if (currentFrame < 70) return "active";
+      if (currentFrame < 110) return "active";
       return "failed";
     }
-    if (quadNum === 2) {
-      if (currentFrame < 85) return "pending";
-      if (currentFrame < 140) return "active";
-      return "failed";
+    if (stageNum === 2) {
+      if (currentFrame < 110) return "pending";
+      if (currentFrame < 230) return "active";
+      return "success";
     }
-    if (quadNum === 3) {
-      if (currentFrame < 155) return "pending";
-      if (currentFrame < 210) return "active";
-      return "failed";
-    }
-    if (quadNum === 4) {
-      if (currentFrame < 225) return "pending";
-      if (currentFrame < 270) return "active";
+    if (stageNum === 3) {
+      if (currentFrame < 230) return "pending";
+      if (currentFrame < 330) return "active";
       return "success";
     }
     return "pending";
   };
 
-  const getQuadStyle = (state: "pending" | "active" | "failed" | "success") => {
+  const getStageStyle = (state: "pending" | "active" | "failed" | "success", stageNum: number) => {
+    const activeColor = stageNum === 1 ? "#3d7a8d" : stageNum === 2 ? "#3b82f6" : "#10b981";
+    const successBg = stageNum === 1 ? "rgba(61, 122, 141, 0.08)" : stageNum === 2 ? "rgba(59, 130, 246, 0.08)" : "rgba(16, 185, 129, 0.08)";
+    const successColor = stageNum === 1 ? "#1a3b4c" : stageNum === 2 ? "#1e3a8a" : "#065f46";
+
     switch (state) {
       case "active":
         return {
-          backgroundColor: "rgba(61, 122, 141, 0.12)",
-          borderColor: "#3d7a8d",
+          backgroundColor: stageNum === 1 ? "rgba(61, 122, 141, 0.12)" : stageNum === 2 ? "rgba(59, 130, 246, 0.12)" : "rgba(16, 185, 129, 0.12)",
+          borderColor: activeColor,
           color: "#1a3b4c",
           transform: "scale(1.03)",
-          boxShadow: "0 15px 35px rgba(61,122,141,0.12)",
+          boxShadow: `0 15px 35px ${stageNum === 1 ? "rgba(61,122,141,0.12)" : stageNum === 2 ? "rgba(59,130,246,0.12)" : "rgba(16,185,129,0.12)"}`,
         };
       case "failed":
         return {
@@ -83,18 +80,18 @@ export const SceneCascade: React.FC = () => {
         };
       case "success":
         return {
-          backgroundColor: "rgba(34, 197, 94, 0.08)",
-          borderColor: "#22c55e",
-          color: "#166534",
+          backgroundColor: successBg,
+          borderColor: activeColor,
+          color: successColor,
           transform: "scale(1.05)",
-          boxShadow: "0 20px 40px rgba(34,197,94,0.12)",
+          boxShadow: `0 20px 40px ${stageNum === 1 ? "rgba(61,122,141,0.12)" : stageNum === 2 ? "rgba(59,130,246,0.12)" : "rgba(16,185,129,0.12)"}`,
         };
       case "pending":
       default:
         return {
           backgroundColor: "#ffffff",
           borderColor: "rgba(26, 59, 76, 0.1)",
-          color: "rgba(26,59,76,0.5)",
+          color: "rgba(26, 59, 76, 0.5)",
           transform: "scale(1)",
         };
     }
@@ -102,43 +99,27 @@ export const SceneCascade: React.FC = () => {
 
   // Status message
   let currentStatus = "Initializing cascade pipeline...";
-  if (frame >= 15 && frame < 70) currentStatus = "Q1: Probing Content Negotiation (Accept: text/turtle)... HTTP 406";
-  else if (frame >= 70 && frame < 85) currentStatus = "Q1 Failed. Cascading to Q2...";
-  else if (frame >= 85 && frame < 140) currentStatus = "Q2: Parsing HTML DOM link describedby... None found";
-  else if (frame >= 140 && frame < 155) currentStatus = "Q2 Failed. Cascading to Q3...";
-  else if (frame >= 155 && frame < 210) currentStatus = "Q3: Resolving external RFC 9264 linksets... None found";
-  else if (frame >= 210 && frame < 225) currentStatus = "Q3 Failed. Cascading to Q4...";
-  else if (frame >= 225 && frame < 270) currentStatus = "Q4: Scanning robots.txt & Domain Sitemap XML...";
-  else if (frame >= 270) currentStatus = "✅ Q4 Success! Discovered sitemap entry with RDF link relation.";
-
-  // Coordinates for pulse calculations
-  // Path 1 (Q1 center to Q2 center): (219, 104) to (681, 104)
-  const pulse1X = interpolate(frame, [70, 85], [219, 681], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const pulse1Opacity = interpolate(frame, [70, 72, 83, 85], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-
-  // Path 2 (Q2 center to Q3 center):
-  // Segment A: (681, 104) to (681, 220)  - [140, 143]
-  // Segment B: (681, 220) to (219, 220)  - [143, 152]
-  // Segment C: (219, 220) to (219, 336)  - [152, 155]
-  let pulse2X = 681;
-  let pulse2Y = 104;
-  if (frame >= 140 && frame <= 155) {
-    const segment = interpolate(frame, [140, 155], [0, 1]);
-    if (segment < 0.2) {
-      pulse2Y = interpolate(segment, [0, 0.2], [104, 220]);
-    } else if (segment < 0.8) {
-      pulse2Y = 220;
-      pulse2X = interpolate(segment, [0.2, 0.8], [681, 219]);
-    } else {
-      pulse2X = 219;
-      pulse2Y = interpolate(segment, [0.8, 1], [220, 336]);
-    }
+  if (frame >= 15 && frame < 110) {
+    currentStatus = "Stage 1: Probing Direct RDF (Conneg, Link headers & Linksets)... HTTP 406";
+  } else if (frame >= 110 && frame < 135) {
+    currentStatus = "Stage 1 Direct RDF failed. Cascading to Stage 2...";
+  } else if (frame >= 135 && frame < 230) {
+    currentStatus = "Stage 2: Probing Semantic Uplifting (Embedded Scripts, Microdata, RDFa, Sitemaps)... Success!";
+  } else if (frame >= 230 && frame < 255) {
+    currentStatus = "Uplifted triples resolved. Cascading to Stage 3 for graph reasoning...";
+  } else if (frame >= 255 && frame < 330) {
+    currentStatus = "Stage 3: Running Inferred & Reasoned (sameAs, SKOS hierarchies, logical inference)...";
+  } else if (frame >= 330) {
+    currentStatus = "✅ Stage 3 Success! Logical reasoning fully resolved transitive RDF structure.";
   }
-  const pulse2Opacity = interpolate(frame, [140, 142, 153, 155], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
-  // Path 3 (Q3 center to Q4 center): (219, 336) to (681, 336)
-  const pulse3X = interpolate(frame, [210, 225], [219, 681], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const pulse3Opacity = interpolate(frame, [210, 212, 223, 225], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Coordinates for pulse calculations (X coords for 3 columns: 150, 450, 750)
+  // Y coord is 150 (vertical center of the 300px high box)
+  const pulse1X = interpolate(frame, [110, 135], [150, 450], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const pulse1Opacity = interpolate(frame, [110, 112, 133, 135], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+
+  const pulse2X = interpolate(frame, [230, 255], [450, 750], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const pulse2Opacity = interpolate(frame, [230, 232, 253, 255], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   return (
     <AbsoluteFill
@@ -177,11 +158,11 @@ export const SceneCascade: React.FC = () => {
         WRX checks each discovery technique sequentially, fallback-routing automatically.
       </p>
 
-      {/* 2x2 Matrix Container */}
+      {/* 3 Columns Container */}
       <div
         style={{
           width: "900px",
-          height: "440px",
+          height: "300px",
           position: "relative",
           marginBottom: "50px",
         }}
@@ -197,36 +178,28 @@ export const SceneCascade: React.FC = () => {
             pointerEvents: "none",
           }}
         >
-          {/* Path 1: Q1 -> Q2 */}
-          <line x1="219" y1="104" x2="681" y2="104" stroke="#3d7a8d" strokeWidth="2.5" strokeDasharray="5,5" opacity="0.35" />
-          
-          {/* Path 2: Q2 -> Q3 */}
-          <path d="M 681,104 L 681,220 L 219,220 L 219,336" stroke="#3d7a8d" strokeWidth="2.5" strokeDasharray="5,5" fill="none" opacity="0.35" />
-          
-          {/* Path 3: Q3 -> Q4 */}
-          <line x1="219" y1="336" x2="681" y2="336" stroke="#3d7a8d" strokeWidth="2.5" strokeDasharray="5,5" opacity="0.35" />
+          {/* Path 1: Stage 1 -> Stage 2 */}
+          <line x1="150" y1="150" x2="450" y2="150" stroke="#3d7a8d" strokeWidth="2.5" strokeDasharray="5,5" opacity="0.35" />
 
-          {/* Glowing Pulse Dot Q1 -> Q2 */}
-          {frame >= 70 && frame <= 85 && (
-            <circle cx={pulse1X} cy="104" r="9" fill="#64b5f6" opacity={pulse1Opacity} style={{ filter: "drop-shadow(0 0 8px #64b5f6)" }} />
+          {/* Path 2: Stage 2 -> Stage 3 */}
+          <line x1="450" y1="150" x2="750" y2="150" stroke="#3b82f6" strokeWidth="2.5" strokeDasharray="5,5" opacity="0.35" />
+
+          {/* Glowing Pulse Dot Stage 1 -> Stage 2 */}
+          {frame >= 110 && frame <= 135 && (
+            <circle cx={pulse1X} cy="150" r="9" fill="#3b82f6" opacity={pulse1Opacity} style={{ filter: "drop-shadow(0 0 8px #3b82f6)" }} />
           )}
 
-          {/* Glowing Pulse Dot Q2 -> Q3 */}
-          {frame >= 140 && frame <= 155 && (
-            <circle cx={pulse2X} cy={pulse2Y} r="9" fill="#64b5f6" opacity={pulse2Opacity} style={{ filter: "drop-shadow(0 0 8px #64b5f6)" }} />
-          )}
-
-          {/* Glowing Pulse Dot Q3 -> Q4 */}
-          {frame >= 210 && frame <= 225 && (
-            <circle cx={pulse3X} cy="336" r="9" fill="#64b5f6" opacity={pulse3Opacity} style={{ filter: "drop-shadow(0 0 8px #64b5f6)" }} />
+          {/* Glowing Pulse Dot Stage 2 -> Stage 3 */}
+          {frame >= 230 && frame <= 255 && (
+            <circle cx={pulse2X} cy="150" r="9" fill="#10b981" opacity={pulse2Opacity} style={{ filter: "drop-shadow(0 0 8px #10b981)" }} />
           )}
         </svg>
 
-        {/* Quadrants Grid */}
+        {/* Stages Grid */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
+            gridTemplateColumns: "1fr 1fr 1fr",
             gap: "24px",
             width: "100%",
             height: "100%",
@@ -235,7 +208,7 @@ export const SceneCascade: React.FC = () => {
             pointerEvents: "none",
           }}
         >
-          {/* Q1: Resource-Direct */}
+          {/* Stage 1: Direct RDF */}
           <div
             style={{
               borderRadius: "20px",
@@ -246,19 +219,19 @@ export const SceneCascade: React.FC = () => {
               flexDirection: "column",
               justifyContent: "center",
               transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-              ...getQuadStyle(getQuadState(1, frame)),
+              ...getStageStyle(getStageState(1, frame), 1),
             }}
           >
-            <div style={{ fontSize: "28px", fontWeight: 900 }}>Q1: Resource-Direct</div>
+            <div style={{ fontSize: "28px", fontWeight: 900 }}>Stage 1: Direct RDF</div>
             <div style={{ fontSize: "17px", marginTop: "10px", opacity: 0.85 }} className="font-mono">
-              Content negotiation, Link header
+              Content negotiation, HTTP Link headers & Linksets
             </div>
-            {getQuadState(1, frame) === "failed" && (
+            {getStageState(1, frame) === "failed" && (
               <div style={{ fontSize: "16px", color: "#ef4444", fontWeight: 800, marginTop: "14px" }}>✖ Failed (HTTP 406 / HTML only)</div>
             )}
           </div>
 
-          {/* Q2: Resource-Inferred */}
+          {/* Stage 2: Semantic Uplifting */}
           <div
             style={{
               borderRadius: "20px",
@@ -269,19 +242,19 @@ export const SceneCascade: React.FC = () => {
               flexDirection: "column",
               justifyContent: "center",
               transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-              ...getQuadStyle(getQuadState(2, frame)),
+              ...getStageStyle(getStageState(2, frame), 2),
             }}
           >
-            <div style={{ fontSize: "28px", fontWeight: 900 }}>Q2: Resource-Inferred</div>
+            <div style={{ fontSize: "28px", fontWeight: 900 }}>Stage 2: Uplifting</div>
             <div style={{ fontSize: "17px", marginTop: "10px", opacity: 0.85 }} className="font-mono">
-              HTML signpost link, script tag
+              Embedded scripts, Microdata, RDFa & Sitemaps
             </div>
-            {getQuadState(2, frame) === "failed" && (
-              <div style={{ fontSize: "16px", color: "#ef4444", fontWeight: 800, marginTop: "14px" }}>✖ Failed (No RDF link tags found)</div>
+            {getStageState(2, frame) === "success" && (
+              <div style={{ fontSize: "16px", color: "#3b82f6", fontWeight: 800, marginTop: "14px" }}>✔ Mapped Base Triples</div>
             )}
           </div>
 
-          {/* Q3: Domain-Direct */}
+          {/* Stage 3: Inferred & Reasoned */}
           <div
             style={{
               borderRadius: "20px",
@@ -292,38 +265,15 @@ export const SceneCascade: React.FC = () => {
               flexDirection: "column",
               justifyContent: "center",
               transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-              ...getQuadStyle(getQuadState(3, frame)),
+              ...getStageStyle(getStageState(3, frame), 3),
             }}
           >
-            <div style={{ fontSize: "28px", fontWeight: 900 }}>Q3: Domain-Direct</div>
+            <div style={{ fontSize: "28px", fontWeight: 900 }}>Stage 3: Reasoned</div>
             <div style={{ fontSize: "17px", marginTop: "10px", opacity: 0.85 }} className="font-mono">
-              Linksets RFC 9264, DCAT Catalogs
+              sameAs equivalence, SKOS hierarchies & logical inference
             </div>
-            {getQuadState(3, frame) === "failed" && (
-              <div style={{ fontSize: "16px", color: "#ef4444", fontWeight: 800, marginTop: "14px" }}>✖ Failed (No external linksets host)</div>
-            )}
-          </div>
-
-          {/* Q4: Domain-Inferred */}
-          <div
-            style={{
-              borderRadius: "20px",
-              borderWidth: "2.5px",
-              borderStyle: "solid",
-              padding: "30px",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-              ...getQuadStyle(getQuadState(4, frame)),
-            }}
-          >
-            <div style={{ fontSize: "28px", fontWeight: 900 }}>Q4: Domain-Inferred</div>
-            <div style={{ fontSize: "17px", marginTop: "10px", opacity: 0.85 }} className="font-mono">
-              robots.txt, Sitemap indices
-            </div>
-            {getQuadState(4, frame) === "success" && (
-              <div style={{ fontSize: "16px", color: "#22c55e", fontWeight: 800, marginTop: "14px" }}>✔ Success (Metadata discovered!)</div>
+            {getStageState(3, frame) === "success" && (
+              <div style={{ fontSize: "16px", color: "#10b981", fontWeight: 800, marginTop: "14px" }}>✔ Graph Resolved!</div>
             )}
           </div>
         </div>

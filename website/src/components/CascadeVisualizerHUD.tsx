@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Globe,
-  ChevronDown,
   Cpu,
   Layers,
   Network,
@@ -28,16 +27,15 @@ interface Preset {
   name: string;
   badge: string;
   uri: string;
-  quadrants: {
-    q1: "success" | "failed" | "pending";
-    q2: "success" | "failed" | "pending";
-    q3: "success" | "failed" | "pending";
-    q4: "success" | "failed" | "pending";
+  stages: {
+    s1: "success" | "failed" | "pending";
+    s2: "success" | "failed" | "pending";
+    s3: "success" | "failed" | "pending";
   };
   timeline: {
     stage: "input" | "blackbox" | "matrix" | "output";
-    activeQuadrant?: number;
-    quadrantStatus?: Record<number, "pending" | "active" | "success" | "failed">;
+    activeStage?: number;
+    stageStatus?: Record<number, "pending" | "active" | "success" | "failed">;
     statusText: string;
     delay: number;
   }[];
@@ -50,17 +48,16 @@ const PRESETS: Record<string, Preset> = {
     name: "Zenodo Repository",
     badge: "Scholarly DOI",
     uri: "https://doi.org/10.5281/zenodo.827613",
-    quadrants: { q1: "failed", q2: "pending", q3: "success", q4: "pending" },
+    stages: { s1: "success", s2: "pending", s3: "pending" },
     timeline: [
       { stage: "input", statusText: "📥 Ingesting: https://doi.org/10.5281/zenodo.827613", delay: 500 },
       { stage: "blackbox", statusText: "🔌 Probing HTTP headers & preflight conneg...", delay: 600 },
-      { stage: "matrix", activeQuadrant: 1, quadrantStatus: { 1: "active", 2: "pending", 3: "pending", 4: "pending" }, statusText: "🔍 Q1: Negotiating application/ld+json... (Fail: 406)", delay: 750 },
-      { stage: "matrix", activeQuadrant: 1, quadrantStatus: { 1: "failed", 2: "pending", 3: "pending", 4: "pending" }, statusText: "🔍 Q1: Checking describedby Link headers... (None found)", delay: 600 },
-      { stage: "matrix", activeQuadrant: 2, quadrantStatus: { 1: "failed", 2: "active", 3: "pending", 4: "pending" }, statusText: "🔍 Q2: Scanning HTML head rel=\"alternate\"... (None)", delay: 700 },
-      { stage: "matrix", activeQuadrant: 3, quadrantStatus: { 1: "failed", 2: "failed", 3: "active", 4: "pending" }, statusText: "🔍 Q3: Resolving external RFC 9264 Linkset...", delay: 750 },
-      { stage: "matrix", activeQuadrant: 3, quadrantStatus: { 1: "failed", 2: "failed", 3: "success", 4: "pending" }, statusText: "✅ Q3: Linkset resolved (describedby -> JSON-LD target)", delay: 800 },
-      { stage: "blackbox", statusText: "⚡ Fetching JSON-LD describedby payload... 200 OK", delay: 800 },
-      { stage: "output", statusText: "🎉 Success! Resolved 4 triples via Zenodo Linkset.", delay: 400 }
+      { stage: "matrix", activeStage: 1, stageStatus: { 1: "active", 2: "pending", 3: "pending" }, statusText: "🔍 Stage 1: Negotiating application/ld+json... (Fail: 406)", delay: 750 },
+      { stage: "matrix", activeStage: 1, stageStatus: { 1: "active", 2: "pending", 3: "pending" }, statusText: "🔍 Stage 1: Checking describedby Link headers... (None found)", delay: 600 },
+      { stage: "matrix", activeStage: 1, stageStatus: { 1: "active", 2: "pending", 3: "pending" }, statusText: "🔍 Stage 1: Resolving external RFC 9264 Linkset...", delay: 750 },
+      { stage: "matrix", activeStage: 1, stageStatus: { 1: "success", 2: "pending", 3: "pending" }, statusText: "✅ Stage 1: Direct Linkset resolved to JSON-LD target", delay: 800 },
+      { stage: "blackbox", statusText: "⚡ Fetching JSON-LD payload... 200 OK", delay: 800 },
+      { stage: "output", statusText: "🎉 Success! Resolved 4 triples via Direct RDF linkset.", delay: 400 }
     ],
     nodes: [
       { id: "s", label: "zenodo:827613", type: "subject", x: 180, y: 110 },
@@ -80,12 +77,12 @@ const PRESETS: Record<string, Preset> = {
     name: "EMBRC Data Portal",
     badge: "EMBRC Portal",
     uri: "https://data.emobon.embrc.eu",
-    quadrants: { q1: "success", q2: "pending", q3: "pending", q4: "pending" },
+    stages: { s1: "success", s2: "pending", s3: "pending" },
     timeline: [
       { stage: "input", statusText: "📥 Ingesting: https://data.emobon.embrc.eu", delay: 500 },
       { stage: "blackbox", statusText: "🔌 Probing HTTP Accept header negotiation...", delay: 600 },
-      { stage: "matrix", activeQuadrant: 1, quadrantStatus: { 1: "active", 2: "pending", 3: "pending", 4: "pending" }, statusText: "🔍 Q1: Negotiating text/turtle content...", delay: 800 },
-      { stage: "matrix", activeQuadrant: 1, quadrantStatus: { 1: "success", 2: "pending", 3: "pending", 4: "pending" }, statusText: "✅ Q1: Directly resolved 200 OK (Content-Type: text/turtle)", delay: 800 },
+      { stage: "matrix", activeStage: 1, stageStatus: { 1: "active", 2: "pending", 3: "pending" }, statusText: "🔍 Stage 1: Negotiating text/turtle content...", delay: 800 },
+      { stage: "matrix", activeStage: 1, stageStatus: { 1: "success", 2: "pending", 3: "pending" }, statusText: "✅ Stage 1: Directly resolved 200 OK (Content-Type: text/turtle)", delay: 800 },
       { stage: "output", statusText: "🎉 Success! Directly negotiated RDF payload.", delay: 400 }
     ],
     nodes: [
@@ -104,16 +101,15 @@ const PRESETS: Record<string, Preset> = {
     name: "MarineInfo Portal",
     badge: "Person Record",
     uri: "https://marineinfo.org/id/person/1",
-    quadrants: { q1: "failed", q2: "success", q3: "pending", q4: "pending" },
+    stages: { s1: "failed", s2: "success", s3: "pending" },
     timeline: [
       { stage: "input", statusText: "📥 Ingesting: https://marineinfo.org/id/person/1", delay: 500 },
-      { stage: "blackbox", statusText: "🔌 Probing headers...", delay: 600 },
-      { stage: "matrix", activeQuadrant: 1, quadrantStatus: { 1: "active", 2: "pending", 3: "pending", 4: "pending" }, statusText: "🔍 Q1: Evaluating Content Negotiation... (Fail: HTML returned)", delay: 800 },
-      { stage: "matrix", activeQuadrant: 3, quadrantStatus: { 1: "failed", 2: "pending", 3: "active", 4: "pending" }, statusText: "🔍 Q3: Probing rel=\"linkset\" headers... (None)", delay: 700 },
-      { stage: "matrix", activeQuadrant: 2, quadrantStatus: { 1: "failed", 2: "active", 3: "failed", 4: "pending" }, statusText: "🔍 Q2: Parsing HTML DOM link describedby...", delay: 800 },
-      { stage: "matrix", activeQuadrant: 2, quadrantStatus: { 1: "failed", 2: "success", 3: "failed", 4: "pending" }, statusText: "✅ Q2: Found alternate signpost -> person/1.ttl", delay: 850 },
-      { stage: "blackbox", statusText: "⚡ Fetching: https://marineinfo.org/id/person/1.ttl... 200 OK", delay: 800 },
-      { stage: "output", statusText: "🎉 Success! Resolved 3 triples via HTML Signposting link.", delay: 400 }
+      { stage: "blackbox", statusText: "🔌 Probing headers & preflight conneg...", delay: 600 },
+      { stage: "matrix", activeStage: 1, stageStatus: { 1: "active", 2: "pending", 3: "pending" }, statusText: "🔍 Stage 1: Evaluating Content Negotiation... (Fail: HTML only)", delay: 800 },
+      { stage: "matrix", activeStage: 1, stageStatus: { 1: "failed", 2: "pending", 3: "pending" }, statusText: "🔍 Stage 1: Probing link header signposts... (None found)", delay: 700 },
+      { stage: "matrix", activeStage: 2, stageStatus: { 1: "failed", 2: "active", 3: "pending" }, statusText: "🔍 Stage 2: Parsing HTML DOM for RDF-like markup...", delay: 800 },
+      { stage: "matrix", activeStage: 2, stageStatus: { 1: "failed", 2: "success", 3: "pending" }, statusText: "✅ Stage 2: Uplifted microdata / schema.org tags on page", delay: 850 },
+      { stage: "output", statusText: "🎉 Success! Resolved 3 triples via Semantic Uplifting.", delay: 400 }
     ],
     nodes: [
       { id: "s", label: "person:1", type: "subject", x: 180, y: 110 },
@@ -131,13 +127,15 @@ const PRESETS: Record<string, Preset> = {
     name: "DBpedia / Wikipedia",
     badge: "Wiki Concept",
     uri: "http://dbpedia.org/resource/Subaru_Impreza_WRX",
-    quadrants: { q1: "success", q2: "pending", q3: "pending", q4: "pending" },
+    stages: { s1: "success", s2: "pending", s3: "success" },
     timeline: [
       { stage: "input", statusText: "📥 Ingesting: http://dbpedia.org/resource/Subaru_Impreza_WRX", delay: 500 },
       { stage: "blackbox", statusText: "🔌 Checking redirect -> dbpedia.org/data/Subaru_Impreza_WRX.jsonld", delay: 700 },
-      { stage: "matrix", activeQuadrant: 1, quadrantStatus: { 1: "active", 2: "pending", 3: "pending", 4: "pending" }, statusText: "🔍 Q1: content-negotiation (Accept: JSON-LD)...", delay: 800 },
-      { stage: "matrix", activeQuadrant: 1, quadrantStatus: { 1: "success", 2: "pending", 3: "pending", 4: "pending" }, statusText: "✅ Q1: Resolved JSON-LD model representing WRX", delay: 800 },
-      { stage: "output", statusText: "🎉 Success! Mapped and resolved 3 triples.", delay: 400 }
+      { stage: "matrix", activeStage: 1, stageStatus: { 1: "active", 2: "pending", 3: "pending" }, statusText: "🔍 Stage 1: content-negotiation (Accept: JSON-LD)...", delay: 800 },
+      { stage: "matrix", activeStage: 1, stageStatus: { 1: "success", 2: "pending", 3: "pending" }, statusText: "✅ Stage 1: Resolved JSON-LD model representing WRX", delay: 700 },
+      { stage: "matrix", activeStage: 3, stageStatus: { 1: "success", 2: "pending", 3: "active" }, statusText: "🔍 Stage 3: Resolving OWL sameAs equivalence & loops...", delay: 800 },
+      { stage: "matrix", activeStage: 3, stageStatus: { 1: "success", 2: "pending", 3: "success" }, statusText: "✅ Stage 3: Equivalence reasoning succeeded", delay: 800 },
+      { stage: "output", statusText: "🎉 Success! Resolved 3 triples with inferred equivalence.", delay: 400 }
     ],
     nodes: [
       { id: "s", label: "dbpedia:Subaru_WRX", type: "subject", x: 180, y: 110 },
@@ -159,12 +157,11 @@ export default function CascadeVisualizerHUD() {
   const [presetIndex, setPresetIndex] = useState<number>(0);
   const [displayedUri, setDisplayedUri] = useState<string>("");
   const [currentStage, setCurrentStage] = useState<"idle" | "input" | "blackbox" | "matrix" | "output">("idle");
-  const [activeQuadrant, setActiveQuadrant] = useState<number | null>(null);
-  const [quadrantStates, setQuadrantStates] = useState<Record<number, "pending" | "active" | "success" | "failed">>({
+  const [activeStage, setActiveStage] = useState<number | null>(null);
+  const [stageStates, setStageStates] = useState<Record<number, "pending" | "active" | "success" | "failed">>({
     1: "pending",
     2: "pending",
-    3: "pending",
-    4: "pending"
+    3: "pending"
   });
   const [showGraph, setShowGraph] = useState<boolean>(false);
   const [graphProgress, setGraphProgress] = useState<number>(0);
@@ -203,13 +200,13 @@ export default function CascadeVisualizerHUD() {
         // 1. Backspacing Phase
         if (displayedUri.length > 0) {
           await new Promise((resolve) => setTimeout(resolve, 800));
-          // Reset status, graph, and quadrants
+          // Reset status, graph, and stages
           setShowGraph(false);
           setGraphProgress(0);
           setCurrentStage("idle");
           setStatusText("");
-          setQuadrantStates({ 1: "pending", 2: "pending", 3: "pending", 4: "pending" });
-          setActiveQuadrant(null);
+          setStageStates({ 1: "pending", 2: "pending", 3: "pending" });
+          setActiveStage(null);
 
           const chars = displayedUri.split("");
           while (chars.length > 0 && active) {
@@ -237,19 +234,19 @@ export default function CascadeVisualizerHUD() {
         setStatusText("Ingesting URI...");
         await new Promise((resolve) => setTimeout(resolve, 400));
 
-        const statuses = { 1: "pending" as const, 2: "pending" as const, 3: "pending" as const, 4: "pending" as const };
+        const statuses = { 1: "pending" as const, 2: "pending" as const, 3: "pending" as const };
 
         for (let j = 0; j < targetPreset.timeline.length && active; j++) {
           const event = targetPreset.timeline[j];
           setCurrentStage(event.stage);
           setStatusText(event.statusText);
 
-          if (event.activeQuadrant) {
-            setActiveQuadrant(event.activeQuadrant);
+          if (event.activeStage !== undefined) {
+            setActiveStage(event.activeStage);
           }
-          if (event.quadrantStatus) {
-            Object.assign(statuses, event.quadrantStatus);
-            setQuadrantStates({ ...statuses });
+          if (event.stageStatus) {
+            Object.assign(statuses, event.stageStatus);
+            setStageStates({ ...statuses });
           }
 
           await new Promise((resolve) => setTimeout(resolve, event.delay));
@@ -318,7 +315,7 @@ export default function CascadeVisualizerHUD() {
         </svg>
       </div>
 
-      {/* 2. CENTER: The Morphing Black Box -> 2x2 Matrix Container */}
+      {/* 2. CENTER: The Morphing Black Box -> 3-Stage Pipeline Container */}
       <div className="w-full max-w-xl h-64 mx-auto relative flex items-center justify-center">
         <AnimatePresence mode="wait">
           {currentStage !== "matrix" ? (
@@ -372,7 +369,7 @@ export default function CascadeVisualizerHUD() {
               </div>
             </motion.div>
           ) : (
-            // Stage 3: The 2x2 Matrix View (Morphed in same position)
+            // Stage 3: The 3-Stage Linear Pipeline View
             <motion.div
               key="matrix"
               initial={{ opacity: 0, scale: 0.95 }}
@@ -402,63 +399,50 @@ export default function CascadeVisualizerHUD() {
 
               <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 relative z-10">
                 <span className="text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 text-slate-350">
-                  <Layers size={14} className="text-accent-light" /> 2x2 Discovery Matrix
+                  <Layers size={14} className="text-accent-light" /> 3-Stage Discovery Pipeline
                 </span>
-                <span className="text-[10px] font-mono text-slate-500">Taxonomy Evaluation</span>
+                <span className="text-[10px] font-mono text-slate-500">Execution Stages</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 relative z-10 flex-1">
-                {/* Q1 */}
-                <div className={`rounded-xl border p-3.5 flex flex-col justify-center transition-all duration-300 ${
-                  activeQuadrant === 1
+              <div className="grid grid-cols-3 gap-3 relative z-10 flex-1">
+                {/* Stage 1 */}
+                <div className={`rounded-xl border p-3 flex flex-col justify-center transition-all duration-300 ${
+                  activeStage === 1
                     ? "bg-accent/20 border-accent text-accent-light shadow-[0_0_10px_rgba(96,165,250,0.1)] scale-[1.02]"
-                    : quadrantStates[1] === "success"
+                    : stageStates[1] === "success"
                     ? "bg-green-950/20 border-green-500/40 text-green-400"
-                    : quadrantStates[1] === "failed"
+                    : stageStates[1] === "failed"
                     ? "bg-red-950/35 border-red-500/30 text-red-400"
                     : "bg-slate-900 border-slate-800/80 text-slate-400"
                 }`}>
-                  <div className="text-[11px] md:text-xs font-sans font-bold uppercase leading-tight truncate">Q1: Resource-Direct</div>
-                  <div className="text-[9px] md:text-xs font-mono opacity-60 mt-1 truncate">Conneg, HTTP Links</div>
+                  <div className="text-[10px] md:text-[11px] font-sans font-bold uppercase leading-tight">Stage 1: Direct</div>
+                  <div className="text-[9px] font-mono opacity-60 mt-1">Conneg, Link headers, Linksets</div>
                 </div>
-                {/* Q2 */}
-                <div className={`rounded-xl border p-3.5 flex flex-col justify-center transition-all duration-300 ${
-                  activeQuadrant === 2
+                {/* Stage 2 */}
+                <div className={`rounded-xl border p-3 flex flex-col justify-center transition-all duration-300 ${
+                  activeStage === 2
                     ? "bg-accent/20 border-accent text-accent-light shadow-[0_0_10px_rgba(96,165,250,0.1)] scale-[1.02]"
-                    : quadrantStates[2] === "success"
+                    : stageStates[2] === "success"
                     ? "bg-green-950/20 border-green-500/40 text-green-400"
-                    : quadrantStates[2] === "failed"
+                    : stageStates[2] === "failed"
                     ? "bg-red-950/35 border-red-500/30 text-red-400"
                     : "bg-slate-900 border-slate-800/80 text-slate-400"
                 }`}>
-                  <div className="text-[11px] md:text-xs font-sans font-bold uppercase leading-tight truncate">Q2: Resource-Inferred</div>
-                  <div className="text-[9px] md:text-xs font-mono opacity-60 mt-1 truncate">HTML signposts, scripts</div>
+                  <div className="text-[10px] md:text-[11px] font-sans font-bold uppercase leading-tight">Stage 2: Uplift</div>
+                  <div className="text-[9px] font-mono opacity-60 mt-1">Microdata, RDFa, Sitemaps/Feeds</div>
                 </div>
-                {/* Q3 */}
-                <div className={`rounded-xl border p-3.5 flex flex-col justify-center transition-all duration-300 ${
-                  activeQuadrant === 3
+                {/* Stage 3 */}
+                <div className={`rounded-xl border p-3 flex flex-col justify-center transition-all duration-300 ${
+                  activeStage === 3
                     ? "bg-accent/20 border-accent text-accent-light shadow-[0_0_10px_rgba(96,165,250,0.1)] scale-[1.02]"
-                    : quadrantStates[3] === "success"
+                    : stageStates[3] === "success"
                     ? "bg-green-950/20 border-green-500/40 text-green-400"
-                    : quadrantStates[3] === "failed"
+                    : stageStates[3] === "failed"
                     ? "bg-red-950/35 border-red-500/30 text-red-400"
                     : "bg-slate-900 border-slate-800/80 text-slate-400"
                 }`}>
-                  <div className="text-[11px] md:text-xs font-sans font-bold uppercase leading-tight truncate">Q3: Domain-Direct</div>
-                  <div className="text-[9px] md:text-xs font-mono opacity-60 mt-1 truncate">Linksets, Catalogs</div>
-                </div>
-                {/* Q4 */}
-                <div className={`rounded-xl border p-3.5 flex flex-col justify-center transition-all duration-300 ${
-                  activeQuadrant === 4
-                    ? "bg-accent/20 border-accent text-accent-light shadow-[0_0_10px_rgba(96,165,250,0.1)] scale-[1.02]"
-                    : quadrantStates[4] === "success"
-                    ? "bg-green-950/20 border-green-500/40 text-green-400"
-                    : quadrantStates[4] === "failed"
-                    ? "bg-red-950/35 border-red-500/30 text-red-400"
-                    : "bg-slate-900 border-slate-800/80 text-slate-400"
-                }`}>
-                  <div className="text-[11px] md:text-xs font-sans font-bold uppercase leading-tight truncate">Q4: Domain-Inferred</div>
-                  <div className="text-[9px] md:text-xs font-mono opacity-60 mt-1 truncate">robots.txt, Sitemap XML</div>
+                  <div className="text-[10px] md:text-[11px] font-sans font-bold uppercase leading-tight">Stage 3: Reason</div>
+                  <div className="text-[9px] font-mono opacity-60 mt-1">sameAs, foaf, loops, pagination</div>
                 </div>
               </div>
 
@@ -572,14 +556,14 @@ export default function CascadeVisualizerHUD() {
 
                     if (!isConnected) return null;
 
-                    // Styles mapping directly to the site palette
+                    // Styles mapping directly to the site palette (no purple)
                     const fill =
                       node.type === "subject"
                         ? "rgba(61, 122, 141, 0.3)"   // Teal fill
                         : node.type === "uri"
                         ? "rgba(100, 181, 246, 0.2)"  // Soft blue fill
                         : node.type === "class"
-                        ? "rgba(129, 140, 248, 0.2)"  // Indigo fill
+                        ? "rgba(13, 148, 136, 0.2)"   // Soft dark teal fill
                         : "rgba(203, 213, 225, 0.15)"; // Literal fill
 
                     const stroke =
@@ -588,7 +572,7 @@ export default function CascadeVisualizerHUD() {
                         : node.type === "uri"
                         ? "#64b5f6" // Soft blue border
                         : node.type === "class"
-                        ? "#818cf8" // Indigo border
+                        ? "#0d9488" // Dark teal border
                         : "#cbd5e1"; // Bright grey border
 
                     const textFill =
@@ -597,7 +581,7 @@ export default function CascadeVisualizerHUD() {
                         : node.type === "uri"
                         ? "#bfdbfe"
                         : node.type === "class"
-                        ? "#c7d2fe"
+                        ? "#ccfbf1"
                         : "#f1f5f9";
 
                     return (

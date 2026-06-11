@@ -36,7 +36,7 @@ import {
 import { extractHtmlHints } from './src/core/html-parser';
 import { discoverFirstRdf, discoverAllRdf } from './src/strategies/pipeline';
 
-const STRATEGY_LABELS: Record<ExtractedRDF['source'], string> = {
+const STRATEGY_LABELS: Record<string, string> = {
   'content-negotiation':    'Content Negotiation',
   'signposting-link-header':'HTTP Link header (rel=describedby)',
   'linkset':                'Linkset (rel=linkset)',
@@ -103,6 +103,9 @@ export function collectProfileValues(relations: LinkRelationObservation[]): stri
   }
   return [...profiles]
 }
+
+export { setLogLevel, addLogListener, removeLogListener } from './src/core/logger';
+export type { LogEvent, LogListener } from './src/core/logger';
 
 if (import.meta.main) {
   (async () => {

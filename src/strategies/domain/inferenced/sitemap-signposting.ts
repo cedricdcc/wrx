@@ -132,8 +132,8 @@ export class SitemapSignpostingStrategy implements DiscoveryStrategy {
   readonly label = 'Sitemap signposting'
   readonly source: ExtractedRDF['source'] = 'sitemap-signposting'
   readonly location = 'Domain' as const
-  readonly extraction = 'Inferenced' as const
-  readonly quadrant = 4 as const
+  readonly extraction = 'Uplifting' as const
+  readonly stage = 2 as const
   readonly specLink = 'https://www.sitemaps.org/protocol.html'
   readonly standard = 'XML Sitemaps & robots.txt'
   readonly extraInfo = 'Traverses domain-wide robots.txt and sitemap.xml to locate resource paths and metadata.'

@@ -1,19 +1,17 @@
 import type { StrategyName } from './types'
 
 export const STRATEGY_ORDER: StrategyName[] = [
-  // Quadrant 1: Resource-Direct
+  // Stage 1: Direct RDF
   'content-negotiation',
   'signposting-link-header',
   'signposting-html-link',
   'embedded-script',
-  'foaf',
-  'same-as',
-  'skos',
-  'rdf-collections',
-  'provenance',
-  'collection-membership',
+  'linkset',
+  'dcat-catalog',
+  'well-known',
+  'resource-map',
 
-  // Quadrant 2: Resource-Inferenced
+  // Stage 2: Semantic Uplifting
   'html-links',
   'rdfa',
   'microdata',
@@ -21,22 +19,22 @@ export const STRATEGY_ORDER: StrategyName[] = [
   'dublin-core',
   'canonical',
   'http-link-relations',
-  'pagination',
-  'reverse-links',
-  'circular-graphs',
-
-  // Quadrant 3: Domain-Direct
-  'linkset',
-  'dcat-catalog',
-  'well-known',
-  'resource-map',
-
-  // Quadrant 4: Domain-Inferenced
   'sitemap-signposting',
   'rss-feed',
   'atom-feed',
   'manifest',
   'api-discovery',
+
+  // Stage 3: Inferred / Reasoned
+  'foaf',
+  'same-as',
+  'skos',
+  'rdf-collections',
+  'provenance',
+  'collection-membership',
+  'pagination',
+  'reverse-links',
+  'circular-graphs',
 ]
 
 export const RDF_MIMES = [

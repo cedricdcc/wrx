@@ -5,8 +5,8 @@ export class FoafStrategy implements DiscoveryStrategy {
   readonly label = 'FOAF Relations'
   readonly source: ExtractedRDF['source'] = 'foaf' as any
   readonly location = 'Resource' as const
-  readonly extraction = 'Direct' as const
-  readonly quadrant = 1 as const
+  readonly extraction = 'Reasoning' as const
+  readonly stage = 3 as const
   readonly specLink = 'http://xmlns.com/foaf/spec/'
   readonly standard = 'FOAF Vocabulary Specification'
   readonly extraInfo = 'TODO: Parse FOAF triples defined directly in the resource payload.'

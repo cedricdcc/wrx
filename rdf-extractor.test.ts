@@ -1063,8 +1063,8 @@ describe('runWrxCli', () => {
     const output = logs.join('\n');
 
     // Diagnostics moved to stderr.
-    expect(errors.join('\n')).toContain(`Extracting RDF from: ${URI}`);
-    expect(errors.join('\n')).toContain('Found RDF (content-negotiation)');
+    expect(errors.join('\n')).toContain(`Starting RDF discovery cascade`);
+    expect(errors.join('\n')).toContain('Initial response is already RDF');
     expect(output).not.toContain('Extended Link Relations (JSON):');
     expect(errors.join('\n')).not.toContain('Profiles discovered:');
   });

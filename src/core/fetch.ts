@@ -1,8 +1,18 @@
 import { RDF_ACCEPT } from './constants'
 import { baseMime } from './utils'
+import { logger } from './logger'
 
 async function fetchWithRedirect(url: string, init?: RequestInit): Promise<Response> {
-  return fetch(url, { ...init, redirect: 'follow' });
+  const method = init?.method || 'GET';
+  logger.debug({ url, method }, 'HTTP Request: %s %s', method, url);
+  try {
+    const res = await fetch(url, { ...init, redirect: 'follow' });
+    logger.debug({ url, method, status: res.status }, 'HTTP Response: %s %s -> %d (%s)', method, url, res.status, res.statusText);
+    return res;
+  } catch (err: any) {
+    logger.debug({ url, method, error: err.message }, 'HTTP Request failed: %s %s -> %s', method, url, err.message);
+    throw err;
+  }
 }
 
 function fetchRDF(url: string): Promise<Response> {

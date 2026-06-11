@@ -2,6 +2,7 @@ import { extname, isAbsolute, resolve } from 'node:path';
 
 import { DataFactory, Parser, Writer } from 'n3';
 import jsonld from 'jsonld';
+import { logger } from '../core/logger';
 
 import type { LinkRelationObservation } from '../core/types';
 import type { ExtractedRDF } from '../core/types';
@@ -165,7 +166,7 @@ async function mergeRdfDocuments(
         merged.push(quad);
       }
     } catch (error) {
-      console.error(`⚠️ Skipping document for merging: ${error instanceof Error ? error.message : String(error)}`);
+      logger.warn({ error }, 'Skipping document for merging: %s', error instanceof Error ? error.message : String(error));
     }
   }
 

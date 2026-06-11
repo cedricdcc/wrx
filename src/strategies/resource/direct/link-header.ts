@@ -34,7 +34,7 @@ export class LinkHeaderStrategy implements DiscoveryStrategy {
   readonly source: ExtractedRDF['source'] = 'signposting-link-header'
   readonly location = 'Resource' as const
   readonly extraction = 'Direct' as const
-  readonly quadrant = 1 as const
+  readonly stage = 1 as const
   readonly specLink = 'https://datatracker.ietf.org/doc/html/rfc8288'
   readonly standard = 'RFC 8288 (Web Linking)'
   readonly extraInfo = 'Inspecting HTTP response headers for explicit rel=describedby/profile relations pointing to native RDF metadata.'

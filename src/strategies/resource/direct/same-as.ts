@@ -5,8 +5,8 @@ export class SameAsStrategy implements DiscoveryStrategy {
   readonly label = 'OWL SameAs equivalence'
   readonly source: ExtractedRDF['source'] = 'same-as' as any
   readonly location = 'Resource' as const
-  readonly extraction = 'Direct' as const
-  readonly quadrant = 1 as const
+  readonly extraction = 'Reasoning' as const
+  readonly stage = 3 as const
   readonly specLink = 'https://www.w3.org/TR/owl2-syntax/#Individual_Equality.2FInequality'
   readonly standard = 'OWL 2 Web Ontology Language'
   readonly extraInfo = 'TODO: Follow OWL sameAs equivalence assertions directly stated in the RDF representation.'

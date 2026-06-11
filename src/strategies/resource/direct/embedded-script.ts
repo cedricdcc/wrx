@@ -16,7 +16,7 @@ export class EmbeddedScriptStrategy implements DiscoveryStrategy {
   readonly source: ExtractedRDF['source'] = 'embedded-script'
   readonly location = 'Resource' as const
   readonly extraction = 'Direct' as const
-  readonly quadrant = 1 as const
+  readonly stage = 1 as const
   readonly specLink = 'https://www.w3.org/TR/json-ld11/'
   readonly standard = 'JSON-LD 1.1 Specification'
   readonly extraInfo = 'Extracts inline semantic data from <script type="application/ld+json"> or <script type="text/turtle"> tags.'

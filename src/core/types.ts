@@ -14,6 +14,7 @@ export interface ExtractedRDF {
   mime: string
   format?: RDFFormat
   source?: string
+  url?: string
 }
 
 export interface RDFOverview {
@@ -59,6 +60,7 @@ export interface ParsedCliArgs {
   output?: string
   profile?: boolean
   report?: boolean
+  verbose?: boolean
 }
 
 export type StrategyName =

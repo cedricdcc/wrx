@@ -5,8 +5,8 @@ export class DublinCoreStrategy implements DiscoveryStrategy {
   readonly label = 'Dublin Core Meta'
   readonly source: ExtractedRDF['source'] = 'dublin-core' as any
   readonly location = 'Resource' as const
-  readonly extraction = 'Inferenced' as const
-  readonly quadrant = 2 as const
+  readonly extraction = 'Uplifting' as const
+  readonly stage = 2 as const
   readonly specLink = 'https://www.dublincore.org/specifications/dublin-core/dcmi-terms/'
   readonly standard = 'Dublin Core DCMI Metadata Terms'
   readonly extraInfo = 'TODO: Parse Dublin Core meta tags (DC.title, DC.creator, etc.) and translate to DCTERMS properties.'

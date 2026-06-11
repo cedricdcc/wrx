@@ -5,8 +5,8 @@ export class ReverseLinksStrategy implements DiscoveryStrategy {
   readonly label = 'Reverse Links'
   readonly source: ExtractedRDF['source'] = 'reverse-links' as any
   readonly location = 'Resource' as const
-  readonly extraction = 'Inferenced' as const
-  readonly quadrant = 2 as const
+  readonly extraction = 'Reasoning' as const
+  readonly stage = 3 as const
   readonly specLink = 'https://www.w3.org/DesignIssues/LinkedData.html'
   readonly standard = 'Linked Data Principles (Backlinks)'
   readonly extraInfo = 'TODO: Verify the presence of reciprocal backlinks to confirm cyclic integrity.'

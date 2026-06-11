@@ -5,8 +5,8 @@ export class HttpLinkRelationsStrategy implements DiscoveryStrategy {
   readonly label = 'HTTP Link Relations'
   readonly source: ExtractedRDF['source'] = 'http-link-relations' as any
   readonly location = 'Resource' as const
-  readonly extraction = 'Inferenced' as const
-  readonly quadrant = 2 as const
+  readonly extraction = 'Uplifting' as const
+  readonly stage = 2 as const
   readonly specLink = 'https://datatracker.ietf.org/doc/html/rfc8288'
   readonly standard = 'RFC 8288 (Web Linking) - Collection/Item'
   readonly extraInfo = 'TODO: Parse Link headers with rel=collection/item/up to construct structural graph.'

@@ -5,8 +5,8 @@ export class ApiDiscoveryStrategy implements DiscoveryStrategy {
   readonly label = 'API Discovery'
   readonly source: ExtractedRDF['source'] = 'api-discovery' as any
   readonly location = 'Domain' as const
-  readonly extraction = 'Inferenced' as const
-  readonly quadrant = 4 as const
+  readonly extraction = 'Uplifting' as const
+  readonly stage = 2 as const
   readonly specLink = 'https://www.w3.org/TR/dwbp/'
   readonly standard = 'Data on the Web Best Practices'
   readonly extraInfo = 'TODO: Traverse hypermedia catalogs and API endpoints to discover and map resource fields.'

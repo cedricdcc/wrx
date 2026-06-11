@@ -5,8 +5,8 @@ export class OpenGraphStrategy implements DiscoveryStrategy {
   readonly label = 'Open Graph Protocol'
   readonly source: ExtractedRDF['source'] = 'open-graph' as any
   readonly location = 'Resource' as const
-  readonly extraction = 'Inferenced' as const
-  readonly quadrant = 2 as const
+  readonly extraction = 'Uplifting' as const
+  readonly stage = 2 as const
   readonly specLink = 'https://ogp.me/'
   readonly standard = 'Open Graph Protocol'
   readonly extraInfo = 'TODO: Parse meta tags from HTML head (og:title, og:image, etc.) and map to schema properties.'

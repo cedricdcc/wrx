@@ -28,7 +28,7 @@ export class LinksetStrategy implements DiscoveryStrategy {
   readonly source: ExtractedRDF['source'] = 'linkset'
   readonly location = 'Domain' as const
   readonly extraction = 'Direct' as const
-  readonly quadrant = 3 as const
+  readonly stage = 1 as const
   readonly specLink = 'https://datatracker.ietf.org/doc/html/rfc9264'
   readonly standard = 'RFC 9264 (Linksets)'
   readonly extraInfo = 'Locates and parses standardized RFC 9264 Linksets (JSON or plain-text representation of link relations).'

@@ -5,8 +5,8 @@ export class MicrodataStrategy implements DiscoveryStrategy {
   readonly label = 'Microdata Markup'
   readonly source: ExtractedRDF['source'] = 'microdata' as any
   readonly location = 'Resource' as const
-  readonly extraction = 'Inferenced' as const
-  readonly quadrant = 2 as const
+  readonly extraction = 'Uplifting' as const
+  readonly stage = 2 as const
   readonly specLink = 'https://www.w3.org/TR/microdata/'
   readonly standard = 'HTML Microdata'
   readonly extraInfo = 'TODO: Parse HTML microdata attributes (itemscope, itemtype, itemprop) and translate to RDF.'

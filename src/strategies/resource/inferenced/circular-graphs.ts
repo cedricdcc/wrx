@@ -5,8 +5,8 @@ export class CircularGraphsStrategy implements DiscoveryStrategy {
   readonly label = 'Circular Graphs'
   readonly source: ExtractedRDF['source'] = 'circular-graphs' as any
   readonly location = 'Resource' as const
-  readonly extraction = 'Inferenced' as const
-  readonly quadrant = 2 as const
+  readonly extraction = 'Reasoning' as const
+  readonly stage = 3 as const
   readonly specLink = 'https://www.w3.org/DesignIssues/LinkedData.html'
   readonly standard = 'Linked Data Principles (Cycles)'
   readonly extraInfo = 'TODO: Handle loop detection and mapping in cyclic node topologies.'

@@ -19,7 +19,7 @@ export class ContentNegotiationStrategy implements DiscoveryStrategy {
   readonly source: ExtractedRDF['source'] = 'content-negotiation'
   readonly location = 'Resource' as const
   readonly extraction = 'Direct' as const
-  readonly quadrant = 1 as const
+  readonly stage = 1 as const
   readonly specLink = 'https://www.w3.org/Protocols/rfc2616/rfc2616-sec12.html'
   readonly standard = 'RFC 2616 Content Negotiation'
   readonly extraInfo = 'Negotiating directly with the server by sending targeted Accept headers for RDF serializations.'

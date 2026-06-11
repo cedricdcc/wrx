@@ -1,5 +1,6 @@
 import type { ExtractedRDF } from '../core/types'
 import { STRATEGY_ORDER, RDF_MIMES, RDF_MIME_SET } from '../core/constants'
+import { logger } from '../core/logger'
 import { fetchWithRedirect, fetchHeadLinkHeader, fetchHtmlFallback, fetchRDF } from '../core/fetch'
 import { baseMime, isRDFMime, normUri } from '../core/utils'
 import { extractHtmlHints } from '../core/html-parser'
@@ -83,7 +84,7 @@ export interface StrategyTraceStep {
   strategy: number
   source: ExtractedRDF['source']
   label: string
-  quadrant: number
+  stage: number
   standard: string
   extraInfo: string
   found: boolean
@@ -230,13 +231,20 @@ async function probeContentNegotiation(uri: string): Promise<ContentNegotiationP
 }
 
 export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null> {
+  logger.info({ uri }, 'Starting RDF discovery cascade (first hit mode) for URI: %s', uri)
   const headPreflightHit = await runHeadSignpostingPreflight(uri)
-  if (headPreflightHit) return headPreflightHit
+  if (headPreflightHit) {
+    const stage = headPreflightHit.source ? STRATEGY_MAP[headPreflightHit.source]?.stage : undefined;
+    logger.info({ uri, source: headPreflightHit.source, url: headPreflightHit.url, stage }, 'Preflight hit found via %s from %s', headPreflightHit.source, headPreflightHit.url)
+    return headPreflightHit
+  }
 
+  logger.debug({ uri }, 'Building strategy context...')
   const ctx = await buildStrategyContext(uri, false)
 
   const ctxAny = ctx as any
   if (ctxAny.initialOk && isRDFMime(ctxAny.initialMime)) {
+    logger.info({ uri, source: 'content-negotiation', url: uri, stage: 1 }, 'Initial response is already RDF (MIME: %s) via content-negotiation', ctxAny.initialMime)
     return {
       content: ctxAny.initialBody,
       mime: ctxAny.initialMime,
@@ -247,6 +255,7 @@ export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null
     } as ExtractedRDF
   }
 
+  logger.debug({ uri }, 'Iterating over strategies in cascade order...')
   // Iterate over STRATEGY_ORDER to try each strategy in order
   for (const source of STRATEGY_ORDER) {
     const strat = STRATEGY_MAP[source]
@@ -258,10 +267,14 @@ export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null
 
     // For linkset, it might need to try multiple candidate URLs (headers + html)
     if (source === 'linkset') {
-      for (const linksetUrl of collectLinksetCandidates(uri, ctx.bodyText, ctx.linkHeader)) {
+      const candidates = collectLinksetCandidates(uri, ctx.bodyText, ctx.linkHeader)
+      logger.debug({ uri, strategy: source, stage: strat.stage, candidatesCount: candidates.length }, 'Evaluating strategy: %s (Stage %s) with %d candidates', strat.label, strat.stage, candidates.length)
+      for (const linksetUrl of candidates) {
+        logger.debug({ uri, strategy: source, stage: strat.stage, linksetUrl }, 'Trying linkset candidate URL: %s', linksetUrl)
         const linksetHit = await linksetStrategy.executeFirstHit({ ...ctx, linksetUrl })
         if (linksetHit) {
           linksetHit.uri = uri
+          logger.info({ uri, strategy: source, stage: strat.stage, url: linksetHit.url }, 'Strategy %s succeeded. Found RDF: %s', strat.label, linksetHit.url)
           return linksetHit
         }
       }
@@ -269,28 +282,38 @@ export async function discoverFirstRdf(uri: string): Promise<ExtractedRDF | null
     }
 
     try {
+      logger.debug({ uri, strategy: source, stage: strat.stage }, 'Executing strategy: %s (Stage %s)', strat.label, strat.stage)
       const hit = await strat.executeFirstHit(ctx)
       if (hit) {
         hit.uri = uri
+        logger.info({ uri, strategy: source, stage: strat.stage, url: hit.url }, 'Strategy %s succeeded. Found RDF: %s', strat.label, hit.url)
         return hit
       }
-    } catch {
+      logger.debug({ uri, strategy: source, stage: strat.stage }, 'Strategy %s yielded no RDF', strat.label)
+    } catch (err: any) {
+      logger.debug({ uri, strategy: source, stage: strat.stage, error: err.message }, 'Strategy %s failed with error: %s', strat.label, err.message)
       // Ignore and continue
     }
   }
 
+  logger.info({ uri }, 'RDF discovery cascade finished (first hit mode). No RDF found.')
   return null
 }
 
 export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
+  logger.info({ uri }, 'Starting exhaustive RDF discovery cascade for URI: %s', uri)
+  logger.debug({ uri }, 'Building strategy context for exhaustive run...')
   const ctx = await buildStrategyContext(uri, true)
   const found: ExtractedRDF[] = []
   const notFound: Array<ExtractedRDF['source']> = []
+
+  logger.debug({ uri }, 'Probing content negotiation MIME types...')
   const contentNegotiations = await probeContentNegotiation(uri)
 
   // Strategy 1: content negotiation
   const connegHits = []
   for (const probe of contentNegotiations) {
+    logger.debug({ uri, mime: probe.requestedMime, responseMime: probe.responseMime, isRdf: probe.isRdf, chars: probe.chars }, 'Conneg probe: Accept=%s -> Response=%s (%d chars, isRdf=%s)', probe.requestedMime, probe.responseMime, probe.chars, probe.isRdf)
     if (probe.isRdf) {
       const existing = connegHits.find((hit) => hit.format === probe.responseMime)
       if (!existing) {
@@ -306,8 +329,10 @@ export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
     }
   }
   if (connegHits.length > 0) {
+    logger.info({ uri, strategy: 'content-negotiation', stage: 1, count: connegHits.length }, 'Content negotiation succeeded. Found %d RDF format(s)', connegHits.length)
     found.push(...connegHits)
   } else {
+    logger.debug({ uri, strategy: 'content-negotiation', stage: 1 }, 'Content negotiation yielded no RDF')
     notFound.push('content-negotiation')
   }
 
@@ -320,8 +345,10 @@ export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
 
     if (source === 'linkset') {
       const linksetCandidates = collectLinksetCandidates(uri, ctx.bodyText, ctx.linkHeader)
+      logger.debug({ uri, strategy: source, stage: strat.stage, candidatesCount: linksetCandidates.length }, 'Executing strategy: %s (Stage %s) with %d candidates', strat.label, strat.stage, linksetCandidates.length)
       let linksetHits: ExtractedRDF[] = []
       for (const linksetUrl of linksetCandidates) {
+        logger.debug({ uri, strategy: source, stage: strat.stage, linksetUrl }, 'Trying linkset candidate URL: %s', linksetUrl)
         const hits = await linksetStrategy.executeAllHits({ ...ctx, linksetUrl })
         if (hits.length > 0) {
           linksetHits.push(...hits)
@@ -329,22 +356,28 @@ export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
       }
       if (linksetHits.length > 0) {
         linksetHits.forEach(h => h.uri = uri)
+        logger.info({ uri, strategy: source, stage: strat.stage, count: linksetHits.length }, 'Strategy %s found %d RDF source(s)', strat.label, linksetHits.length)
         found.push(...linksetHits)
       } else {
+        logger.debug({ uri, strategy: source, stage: strat.stage }, 'Strategy %s yielded no RDF', strat.label)
         notFound.push('linkset')
       }
       continue
     }
 
     try {
+      logger.debug({ uri, strategy: source, stage: strat.stage }, 'Executing strategy: %s (Stage %s)', strat.label, strat.stage)
       const hits = await strat.executeAllHits(ctx)
       if (hits.length > 0) {
         hits.forEach(h => h.uri = uri)
+        logger.info({ uri, strategy: source, stage: strat.stage, count: hits.length }, 'Strategy %s found %d RDF source(s)', strat.label, hits.length)
         found.push(...hits)
       } else {
+        logger.debug({ uri, strategy: source, stage: strat.stage }, 'Strategy %s yielded no RDF', strat.label)
         notFound.push(source)
       }
-    } catch {
+    } catch (err: any) {
+      logger.debug({ uri, strategy: source, stage: strat.stage, error: err.message }, 'Strategy %s failed with error: %s', strat.label, err.message)
       notFound.push(source)
     }
   }
@@ -356,7 +389,7 @@ export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
       strategy: i + 1,
       source,
       label: strat ? strat.label : source,
-      quadrant: strat ? strat.quadrant : 1,
+      stage: strat ? strat.stage : 1,
       standard: strat?.standard || '',
       extraInfo: strat?.extraInfo || '',
       found: hits.length > 0,
@@ -368,5 +401,6 @@ export async function discoverAllRdf(uri: string): Promise<DiscoveryOverview> {
     }
   })
 
+  logger.info({ uri, totalFound: found.length }, 'Exhaustive RDF discovery cascade complete. Total unique RDF sources found: %d', found.length)
   return { found, notFound, contentNegotiations, trace }
 }

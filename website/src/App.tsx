@@ -29,7 +29,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import KnowledgeGraph from "./components/KnowledgeGraph";
-import { extractRDF, extractLinkRelations, extractAllRDF, collectProfileValues } from "wrx";
+import { extractRDF, extractLinkRelations, extractAllRDF, collectProfileValues, addLogListener, removeLogListener } from "wrx";
 import * as N3 from "n3";
 import { QueryEngine } from "@comunica/query-sparql-rdfjs";
 import jsonld from "jsonld";
@@ -293,22 +293,21 @@ const ProblemSection = () => {
 const StrategiesSection = () => {
   const [selectedStrategy, setSelectedStrategy] = useState<any | null>(null);
 
-  // Group strategies by quadrant
-  const q1 = ALL_STRATEGIES.filter(s => s.quadrant === 1);
-  const q2 = ALL_STRATEGIES.filter(s => s.quadrant === 2);
-  const q3 = ALL_STRATEGIES.filter(s => s.quadrant === 3);
-  const q4 = ALL_STRATEGIES.filter(s => s.quadrant === 4);
+  // Group strategies by stage
+  const s1 = ALL_STRATEGIES.filter(s => s.stage === 1);
+  const s2 = ALL_STRATEGIES.filter(s => s.stage === 2);
+  const s3 = ALL_STRATEGIES.filter(s => s.stage === 3);
 
-  const renderQuadrantCard = (title: string, quadrantNum: number, strategies: any[], desc: string, badgeColor: string) => {
+  const renderStageCard = (title: string, stageNum: number, strategies: any[], desc: string, badgeColor: string) => {
     return (
       <div className="strategy-card-blueprint p-6 rounded-2xl flex flex-col justify-between group transition-all hover:border-accent hover:shadow-2xl duration-300">
         <div>
           <div className="flex justify-between items-center mb-4">
             <span className="font-sans font-black text-poster-dark/80 text-base uppercase tracking-wider">
-              Q{quadrantNum}: {title}
+              Stage {stageNum}: {title}
             </span>
             <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${badgeColor} uppercase tracking-wider`}>
-              {quadrantNum === 1 || quadrantNum === 3 ? "Direct RDF" : "Inferenced"}
+              {stageNum === 1 ? "Direct RDF" : stageNum === 2 ? "Uplifting" : "Reasoning"}
             </span>
           </div>
           <p className="text-xs text-poster-dark/60 font-medium mb-6 leading-relaxed">
@@ -359,7 +358,7 @@ const StrategiesSection = () => {
       <div className="mb-16">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-8 h-px bg-accent/30" />
-          <span className="text-accent font-black uppercase text-xs tracking-widest block">2X2 TAXONOMY MATRIX</span>
+          <span className="text-accent font-black uppercase text-xs tracking-widest block">3-STAGE DISCOVERY PIPELINE</span>
         </div>
         <h2 className="text-4xl md:text-5xl font-black text-poster-dark tracking-tighter">
           Cascading Discovery Pipeline
@@ -369,42 +368,33 @@ const StrategiesSection = () => {
         </p>
       </div>
 
-      {/* 2x2 Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
-        {/* Quadrant 1 */}
-        {renderQuadrantCard(
-          "Resource-Direct",
+      {/* 3-Column Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+        {/* Stage 1 */}
+        {renderStageCard(
+          "Direct RDF Retrieval",
           1,
-          q1,
-          "Natively serialized RDF retrieved directly from the resource URI response headers or page body.",
+          s1,
+          "Natively serialized RDF payloads retrieved directly from the resource URI response headers or page body.",
           "bg-accent/10 text-accent border border-accent/20"
         )}
 
-        {/* Quadrant 2 */}
-        {renderQuadrantCard(
-          "Resource-Inferenced",
+        {/* Stage 2 */}
+        {renderStageCard(
+          "Semantic Uplifting",
           2,
-          q2,
-          "Embedded markup or hyperlinks within the resource page that the client must parse and translate into RDF.",
+          s2,
+          "Embedded markup or sitemaps within the resource domain that the client must parse and translate into RDF.",
           "bg-blue-500/10 text-blue-600 border border-blue-200/20"
         )}
 
-        {/* Quadrant 3 */}
-        {renderQuadrantCard(
-          "Domain-Direct",
+        {/* Stage 3 */}
+        {renderStageCard(
+          "Inferred & Reasoned RDF",
           3,
-          q3,
-          "Natively serialized RDF datasets hosted at domain-wide endpoints or dynamic catalogs.",
-          "bg-teal-500/10 text-teal-600 border border-teal-200/20"
-        )}
-
-        {/* Quadrant 4 */}
-        {renderQuadrantCard(
-          "Domain-Inferenced",
-          4,
-          q4,
-          "Host-wide XML indices, sitemaps, and feeds that detail resource paths and require translation to RDF.",
-          "bg-indigo-500/10 text-indigo-600 border border-indigo-200/20"
+          s3,
+          "Reasoning upon the already collected RDF triples to verify loop topologies, sameAs identities, or SKOS concept paths.",
+          "bg-emerald-500/10 text-emerald-600 border border-emerald-250/20"
         )}
       </div>
 
@@ -439,7 +429,7 @@ const StrategiesSection = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-mono text-[10px] font-black uppercase tracking-widest text-accent">
-                      Quadrant {selectedStrategy.quadrant}
+                      Stage {selectedStrategy.stage}
                     </span>
                     <span className={`px-2 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider ${IMPLEMENTED_STRATEGY_IDS.includes(selectedStrategy.source)
                         ? "bg-green-500/10 text-green-600"
@@ -521,35 +511,32 @@ const StrategiesSection = () => {
 };
 
 const RoadmapSection = () => {
-  const [activeTab, setActiveTab] = useState<1 | 3 | 2 | 4>(1); // Quadrant rank order: 1 -> 3 -> 2 -> 4
+  const [activeTab, setActiveTab] = useState<1 | 2 | 3>(1); // Stage order: 1 -> 2 -> 3
 
-  // Group strategies by quadrant
-  const q1 = ALL_STRATEGIES.filter(s => s.quadrant === 1);
-  const q2 = ALL_STRATEGIES.filter(s => s.quadrant === 2);
-  const q3 = ALL_STRATEGIES.filter(s => s.quadrant === 3);
-  const q4 = ALL_STRATEGIES.filter(s => s.quadrant === 4);
+  // Group strategies by stage
+  const s1 = ALL_STRATEGIES.filter(s => s.stage === 1);
+  const s2 = ALL_STRATEGIES.filter(s => s.stage === 2);
+  const s3 = ALL_STRATEGIES.filter(s => s.stage === 3);
 
-  // Count implemented per quadrant
+  // Count implemented per stage
   const countImplemented = (strategies: any[]) =>
     strategies.filter(s => IMPLEMENTED_STRATEGY_IDS.includes(s.source)).length;
 
-  const q1Imp = countImplemented(q1);
-  const q2Imp = countImplemented(q2);
-  const q3Imp = countImplemented(q3);
-  const q4Imp = countImplemented(q4);
+  const s1Imp = countImplemented(s1);
+  const s2Imp = countImplemented(s2);
+  const s3Imp = countImplemented(s3);
 
-  const totalImplemented = q1Imp + q2Imp + q3Imp + q4Imp;
+  const totalImplemented = s1Imp + s2Imp + s3Imp;
   const totalStrategies = ALL_STRATEGIES.length;
   const percentage = Math.round((totalImplemented / totalStrategies) * 100);
 
-  const quadrants = [
-    { id: 1 as const, name: "Resource-Direct", rank: 1, count: q1.length, imp: q1Imp, color: "accent", strategies: q1, desc: "Direct RDF payloads served on the resource URI." },
-    { id: 3 as const, name: "Domain-Direct", rank: 2, count: q3.length, imp: q3Imp, color: "teal-500", strategies: q3, desc: "Direct RDF catalogs hosted at host-wide entrypoints." },
-    { id: 2 as const, name: "Resource-Inferenced", rank: 3, count: q2.length, imp: q2Imp, color: "blue-500", strategies: q2, desc: "Embedded page structures requiring client translation to RDF." },
-    { id: 4 as const, name: "Domain-Inferenced", rank: 4, count: q4.length, imp: q4Imp, color: "indigo-500", strategies: q4, desc: "Domain XML indices and feeds describing resource locations." }
+  const stages = [
+    { id: 1 as const, name: "Direct RDF Retrieval", rank: 1, count: s1.length, imp: s1Imp, color: "accent", strategies: s1, desc: "Direct RDF payloads resolved from response headers, scripts, or catalogs." },
+    { id: 2 as const, name: "Semantic Uplifting", rank: 2, count: s2.length, imp: s2Imp, color: "blue-500", strategies: s2, desc: "HTML page markup and XML syndication feeds mapped and converted to RDF." },
+    { id: 3 as const, name: "Inferred & Reasoned RDF", rank: 3, count: s3.length, imp: s3Imp, color: "emerald-500", strategies: s3, desc: "Algorithmic and logical reasoning on collected RDF graphs (sameAs, SKOS)." }
   ];
 
-  const activeQuad = quadrants.find(q => q.id === activeTab)!;
+  const activeQuad = stages.find(q => q.id === activeTab)!;
 
   return (
     <section id="roadmap" className="relative py-24 md:py-32 z-20 max-w-6xl mx-auto px-8 border-t border-accent/10">
@@ -564,7 +551,7 @@ const RoadmapSection = () => {
               Implementation Roadmap
             </h2>
             <p className="text-poster-dark/60 max-w-xl mt-4 font-medium">
-              Tracking the completeness of the WRX discovery engine. Quadrants are prioritized by their semantic confidence ranking (Resource-Direct first, Domain-Inferenced last).
+              Tracking the completeness of the WRX discovery engine. Stages are prioritized by their pipeline execution order (Direct first, Inferred last).
             </p>
           </div>
 
@@ -606,9 +593,9 @@ const RoadmapSection = () => {
         </div>
       </div>
 
-      {/* Quadrant Progress Dashboard */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-        {quadrants.map((q) => {
+      {/* Stage Progress Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+        {stages.map((q) => {
           const isSelected = activeTab === q.id;
           const qPercent = Math.round((q.imp / q.count) * 100);
           return (
@@ -622,14 +609,14 @@ const RoadmapSection = () => {
             >
               <div className="text-[9px] font-mono font-black uppercase tracking-wider text-poster-dark/40 mb-1 flex items-center justify-between">
                 <span>Rank {q.rank}</span>
-                <span>Q{q.id}</span>
+                <span>Stage {q.id}</span>
               </div>
               <h4 className="font-black text-sm text-poster-dark truncate mb-3">
                 {q.name}
               </h4>
               <div className="w-full bg-poster-dark/5 rounded-full h-1.5 mb-2 overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${q.id === 1 ? "bg-accent" : q.id === 3 ? "bg-teal-500" : q.id === 2 ? "bg-blue-500" : "bg-indigo-500"
+                  className={`h-full rounded-full ${q.id === 1 ? "bg-accent" : q.id === 2 ? "bg-blue-500" : "bg-emerald-500"
                     }`}
                   style={{ width: `${qPercent}%` }}
                 />
@@ -649,7 +636,7 @@ const RoadmapSection = () => {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-accent">
-                Quadrant {activeQuad.id} Mappings
+                Stage {activeQuad.id} Mappings
               </span>
               <span className="px-2 py-0.5 bg-accent/5 border border-accent/10 rounded text-[9px] font-mono font-bold text-accent uppercase tracking-wider">
                 Rank {activeQuad.rank} Priority
@@ -855,7 +842,7 @@ const TryOutSection = () => {
   const [querying, setQuerying] = useState(false);
   const [sparqlError, setSparqlError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'graph' | 'sparql' | 'triples' | 'report'>('report');
+  const [activeTab, setActiveTab] = useState<'graph' | 'sparql' | 'triples' | 'report' | 'logs'>('logs');
   const [selectedUri, setSelectedUri] = useState<string | null>(null);
   const [showUriActions, setShowUriActions] = useState(false);
 
@@ -866,6 +853,16 @@ const TryOutSection = () => {
   const [traceSteps, setTraceSteps] = useState<any[]>([]);
   const [strategyTriples, setStrategyTriples] = useState<Record<string, any[]>>({});
   const [selectedReportStrategy, setSelectedReportStrategy] = useState<any | null>(null);
+
+  // Live Execution Logs
+  const [logs, setLogs] = useState<any[]>([]);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (activeTab === 'logs' && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs.length, activeTab]);
 
   const parseRdfToTriples = async (contentStr: string, format: string, url: string): Promise<any[]> => {
     const triples: any[] = [];
@@ -922,6 +919,13 @@ const TryOutSection = () => {
       setFilteredTriples(null);
     }
     setSparqlResults([]);
+    setLogs([]);
+    setActiveTab('logs');
+
+    const logHandler = (event: any) => {
+      setLogs(prev => [...prev, event]);
+    };
+    addLogListener(logHandler);
 
     try {
       // Direct client-side RDF extraction using WRX
@@ -1076,6 +1080,7 @@ const TryOutSection = () => {
       setError(err.response?.data?.error || err.message || "Failed to extract");
     } finally {
       setLoading(false);
+      removeLogListener(logHandler);
     }
   };
 
@@ -1320,6 +1325,12 @@ const TryOutSection = () => {
                   >
                     <Activity size={16} /> Cascade Report
                   </button>
+                  <button
+                    onClick={() => setActiveTab('logs')}
+                    className={`px-8 py-5 text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 border-r border-accent/10 ${activeTab === 'logs' ? 'bg-white text-accent' : 'text-[#666] hover:bg-white/50'}`}
+                  >
+                    <TerminalSquare size={16} /> Execution Logs
+                  </button>
                 </div>
                 <div className="px-6 hidden sm:block">
                   <span className="text-[10px] text-[#666] font-mono uppercase tracking-tighter">Exploration Workspace</span>
@@ -1423,6 +1434,46 @@ const TryOutSection = () => {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                )}
+
+                {activeTab === 'logs' && (
+                  <div className="flex-1 bg-[#0a0a0a] p-6 font-mono text-xs text-white/80 overflow-y-auto max-h-[600px] flex flex-col gap-1 select-text">
+                    {logs.length > 0 ? (
+                      <>
+                        {logs.map((log, index) => {
+                          const timeStr = new Date(log.time).toISOString().split('T')[1].slice(0, -1);
+                          const rawLevel = typeof log.level === 'string' ? log.level : String(log.level || 'info');
+                          let levelColor = 'text-green-400';
+                          if (rawLevel === 'debug') levelColor = 'text-cyan-400';
+                          if (rawLevel === 'warn') levelColor = 'text-yellow-400';
+                          if (rawLevel === 'error') levelColor = 'text-red-400';
+                          
+                          const extraKeys = ['level', 'msg', 'time', 'v'];
+                          const meta: Record<string, any> = {};
+                          for (const key of Object.keys(log)) {
+                            if (!extraKeys.includes(key)) {
+                              meta[key] = log[key];
+                            }
+                          }
+                          const metaStr = Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : '';
+
+                          return (
+                            <div key={index} className="flex gap-2 items-start hover:bg-white/5 py-0.5 px-1 rounded transition-colors">
+                              <span className="text-white/40 select-none">[{timeStr}]</span>
+                              <span className={`${levelColor} font-bold select-none`}>{rawLevel.toUpperCase()}:</span>
+                              <span className="text-white/95 break-all">{log.msg}</span>
+                              {metaStr && <span className="text-white/30 break-all">{metaStr}</span>}
+                            </div>
+                          );
+                        })}
+                        <div ref={logsEndRef} />
+                      </>
+                    ) : (
+                      <div className="text-white/30 italic text-center py-12">
+                        No execution logs captured yet. Run an extraction above to stream live log events.
+                      </div>
+                    )}
                   </div>
                 )}
 
