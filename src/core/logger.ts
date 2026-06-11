@@ -1,5 +1,4 @@
-import * as pinoModule from 'pino';
-const pino = (pinoModule as any).default || pinoModule.pino || pinoModule;
+
 
 export interface LogEvent {
   level: string;
@@ -67,85 +66,64 @@ function triggerListeners(event: LogEvent) {
 // We will construct the logger. If it fails or we want custom behavior, we wrap it.
 let pinoLogger: any = null;
 
-try {
-  if (!isBrowser) {
-    pinoLogger = pino({
-      level: currentLevel,
-    }, {
-      write(str: string) {
-        try {
-          const obj = JSON.parse(str);
-          const levelNum = obj.level;
-          const level = PINO_LEVELS[levelNum] || 'info';
-          
-          const event: LogEvent = {
-            ...obj,
-            level,
-            msg: obj.msg,
-            time: obj.time || Date.now(),
-          };
-          delete (event as any).v;
-          
-          triggerListeners(event);
+if (!isBrowser) {
+  import(/* @vite-ignore */ 'pino')
+    .then((pinoModule) => {
+      const pino = pinoModule.default || pinoModule.pino || pinoModule;
+      pinoLogger = pino({
+        level: currentLevel,
+      }, {
+        write(str: string) {
+          try {
+            const obj = JSON.parse(str);
+            const levelNum = obj.level;
+            const level = PINO_LEVELS[levelNum] || 'info';
+            
+            const event: LogEvent = {
+              ...obj,
+              level,
+              msg: obj.msg,
+              time: obj.time || Date.now(),
+            };
+            delete (event as any).v;
+            
+            triggerListeners(event);
 
-          // Pretty-print to stderr in Node/Bun TTY
-          const timeStr = new Date(event.time).toISOString().split('T')[1].slice(0, -1);
-          let colorStart = '';
-          let colorEnd = '\x1b[0m';
-          switch (level) {
-            case 'debug': colorStart = '\x1b[36m'; break; // cyan
-            case 'info': colorStart = '\x1b[32m'; break; // green
-            case 'warn': colorStart = '\x1b[33m'; break; // yellow
-            case 'error': colorStart = '\x1b[31m'; break; // red
-            case 'fatal': colorStart = '\x1b[35m'; break; // magenta
-          }
-          
-          let extra = '';
-          const keysToSkip = ['level', 'msg', 'time', 'v'];
-          const meta: Record<string, any> = {};
-          for (const k of Object.keys(event)) {
-            if (!keysToSkip.includes(k)) {
-              meta[k] = event[k];
+            // Pretty-print to stderr in Node/Bun TTY
+            const timeStr = new Date(event.time).toISOString().split('T')[1].slice(0, -1);
+            let colorStart = '';
+            let colorEnd = '\x1b[0m';
+            switch (level) {
+              case 'debug': colorStart = '\x1b[36m'; break; // cyan
+              case 'info': colorStart = '\x1b[32m'; break; // green
+              case 'warn': colorStart = '\x1b[33m'; break; // yellow
+              case 'error': colorStart = '\x1b[31m'; break; // red
+              case 'fatal': colorStart = '\x1b[35m'; break; // magenta
             }
-          }
-          if (Object.keys(meta).length > 0) {
-            extra = ' ' + JSON.stringify(meta);
-          }
+            
+            let extra = '';
+            const keysToSkip = ['level', 'msg', 'time', 'v'];
+            const meta: Record<string, any> = {};
+            for (const k of Object.keys(event)) {
+              if (!keysToSkip.includes(k)) {
+                meta[k] = event[k];
+              }
+            }
+            if (Object.keys(meta).length > 0) {
+              extra = ' ' + JSON.stringify(meta);
+            }
 
-          const formatted = `[${timeStr}] ${colorStart}${level.toUpperCase()}${colorEnd}: ${event.msg}${extra}`;
-          console.error(formatted);
-        } catch {
-          console.error(str.trim());
+            const formatted = `[${timeStr}] ${colorStart}${level.toUpperCase()}${colorEnd}: ${event.msg}${extra}`;
+            console.error(formatted);
+          } catch {
+            console.error(str.trim());
+          }
         }
-      }
+      });
+    })
+    .catch(() => {
+      // Defensive fallback in case Pino loading has issues
     });
-  } else {
-    // In browser, use standard Pino with custom browser configuration
-    pinoLogger = pino({
-      level: currentLevel,
-      browser: {
-        asObject: true,
-        write(obj: any) {
-          const levelNum = obj.level;
-          const level = PINO_LEVELS[levelNum] || 'info';
-          const event: LogEvent = {
-            ...obj,
-            level,
-            msg: obj.msg,
-            time: obj.time || Date.now(),
-          };
-          
-          triggerListeners(event);
-
-          const method = level === 'warn' ? 'warn' : level === 'error' ? 'error' : 'log';
-          console[method](`[WRX ${level.toUpperCase()}] ${event.msg}`, event);
-        }
-      }
-    });
-  }
-} catch (e) {
-  // Defensive fallback in case Pino loading has bundling issues
-  console.warn('Failed to initialize Pino, falling back to console logger:', e);
 }
 
 // Wrapper interface to match Pino
